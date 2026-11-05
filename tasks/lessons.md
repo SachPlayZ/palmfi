@@ -1,0 +1,1 @@
+- Foundry `cast`/`forge` 1.x: `ETH_PASSWORD` = path to password *file*, not the password (raw password leaks in error). Never export it: makes `cast call` demand --keystore. Pass `--password-file <mktemp file>` only to signing cmds.
