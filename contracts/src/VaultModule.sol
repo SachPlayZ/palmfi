@@ -22,6 +22,7 @@ contract VaultModule is VaultBase {
 
     function tightenLimits(uint128 cap, uint32 floor_, uint32 max_, uint32 capDelay_) external onlyWallet {
         if (cap > hardCap || floor_ < floorDelay || max_ < maxDelay || capDelay_ < capDelay) revert NotTightening();
+        _checkLimits(floor_, max_, capDelay_);
         hardCap = cap;
         floorDelay = floor_;
         maxDelay = max_;
@@ -51,6 +52,9 @@ contract VaultModule is VaultBase {
         if (kind == T.CHANGE_ADD_WALLET) {
             abi.decode(data, (address));
             pendingWalletAdds++;
+        } else if (kind == T.CHANGE_LIMITS) {
+            (, uint32 f, uint32 m, uint32 cd) = abi.decode(data, (uint128, uint32, uint32, uint32));
+            _checkLimits(f, m, cd);
         }
         id = ++nextChangeId;
         Change storage c = _changes[id];
@@ -86,10 +90,14 @@ contract VaultModule is VaultBase {
         _apply(c);
     }
 
-    /// Any wallet can drop a change a majority hasn't passed (e.g. an attacker's wallet-add). Tightening.
+    /// Any wallet can drop a loosening change a majority hasn't passed (e.g. an attacker's wallet-add). Protective
+    /// changes (remove wallet, unfreeze, migrate) can't be cancelled, or one hacked wallet could block recovery.
     function cancelChange(uint256 id) external onlyWallet {
         Change storage c = _changes[id];
         if (c.createdAt == 0 || c.done || c.eta != 0) revert BadState();
+        if (c.kind == T.CHANGE_REMOVE_WALLET || c.kind == T.CHANGE_UNFREEZE || c.kind == T.CHANGE_MIGRATE) {
+            revert NotCancellable();
+        }
         c.done = true;
         if (c.kind == T.CHANGE_ADD_WALLET) pendingWalletAdds--;
     }

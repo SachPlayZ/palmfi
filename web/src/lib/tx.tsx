@@ -53,6 +53,10 @@ const hints: Record<string, string> = {
   FrozenToken: "one side of this payment is Frozen",
   InsufficientReserve: "the pool doesn't hold enough of the payee's token right now; try a smaller amount or settle",
   Slippage: "the price moved past your limit",
+  BadLimits: "delays must satisfy Floor ≤ CapDelay ≤ MaxDelay ≤ 5 days",
+  NotCancellable: "removals, unfreeze and migrate can't be cancelled by one wallet",
+  BadRecipient: "payments go to a wallet of the payee Vault",
+  InsufficientLiquidity: "both orgs need liquidity in the Orbital pool before paying through it",
 };
 
 /** Sends a contract write on Arc testnet, waits for the receipt and refreshes cached reads. */

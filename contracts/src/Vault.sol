@@ -17,6 +17,7 @@ contract Vault is VaultBase {
     function initialize(T.VaultConfig calldata c, Wiring calldata w) external {
         if (address(factory) != address(0)) revert Unauthorized();
         if (c.wallets.length < MIN_WALLETS) revert TooFewWallets();
+        _checkLimits(c.floorDelay, c.maxDelay, c.capDelay);
         factory = IVaultFactory(msg.sender);
         hub = IHub(w.hub);
         usdc = w.usdc;
@@ -293,6 +294,11 @@ contract Vault is VaultBase {
         return hub.statusOf(address(this)) != T.STATUS_ACTIVE;
     }
 
+    function canSettleOut() public view returns (bool) {
+        uint8 s = hub.statusOf(address(this));
+        return s == T.STATUS_ACTIVE || s == T.STATUS_MIGRATED;
+    }
+
     // ------------------------------------------------------------------
     // Orbital pool seam (#33; IOrbitalVault)
     // ------------------------------------------------------------------
@@ -307,8 +313,10 @@ contract Vault is VaultBase {
     }
 
     /// Settlement, issuer side: the hook has just moved `amount` of this Vault's tokens out of the pool to this
-    /// Vault; burn them and send their USDC backing to `toVault`. Halts while Frozen (a frozen token is a depeg).
-    function settleOut(uint256 amount, address toVault) external onlyHook outflowsOpen {
+    /// Vault; burn them and send their USDC backing to `toVault`. Halts while Frozen (a frozen token is a depeg);
+    /// a Migrated Vault still settles, from the USDC it kept back for exactly these tokens.
+    function settleOut(uint256 amount, address toVault) external onlyHook {
+        if (!canSettleOut()) revert NotActive();
         if (!factory.isVault(toVault) || toVault == address(this)) revert NotFactoryVault();
         ProtectedToken(token).burn(address(this), amount);
         IERC20(usdc).safeTransfer(toVault, amount);

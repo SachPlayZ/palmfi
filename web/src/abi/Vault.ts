@@ -45,6 +45,19 @@ export const vaultAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_DELAY_LIMIT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PENDING_PER_WALLET",
     "inputs": [],
     "outputs": [
@@ -234,6 +247,19 @@ export const vaultAbi = [
         "name": "",
         "type": "uint128",
         "internalType": "uint128"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "canSettleOut",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -1185,6 +1211,11 @@ export const vaultAbi = [
   },
   {
     "type": "error",
+    "name": "BadLimits",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BadState",
     "inputs": []
   },
@@ -1213,6 +1244,11 @@ export const vaultAbi = [
   {
     "type": "error",
     "name": "NotActive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotCancellable",
     "inputs": []
   },
   {

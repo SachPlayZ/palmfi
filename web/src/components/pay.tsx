@@ -100,7 +100,7 @@ export function PoolPayCard({ v }: { v: VaultView }) {
         <Field label="Amount they receive (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
-        {quote.error && <p className="text-xs text-red-600 dark:text-red-400">Pool can&apos;t quote this: a side may be Frozen or the pool is short. Try a smaller amount or settle.</p>}
+        {quote.error && <p className="text-xs text-red-600 dark:text-red-400">Pool can&apos;t quote this: both orgs need liquidity in the pool, neither may be Frozen, and the pool may be short (try less, or settle).</p>}
         {amountIn !== undefined && (
           <p className="text-sm">
             You pay <span className="tabular font-medium">{fmtAmount(amountIn)} {v.symbol}</span> ({formatUsd(amountIn - (amt ?? 0n))} pool spread)

@@ -17,6 +17,7 @@ import {OrbitalMath} from "./OrbitalMath.sol";
 interface IOrbitalVault {
     function token() external view returns (address);
     function isFrozen() external view returns (bool);
+    function canSettleOut() external view returns (bool);
     function isWallet(address) external view returns (bool);
     function chargeOutflow(address wallet, uint256 amount) external;
     function settleOut(uint256 amount, address toVault) external;
@@ -111,7 +112,7 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     /// A new Vault's token joins the sphere: one facade PoolKey with every existing token.
     function registerToken(address vault) external {
         if (msg.sender != factory) revert OnlyFactory();
-        if (tokens.length >= MAX_TOKENS) revert TooManyTokens();
+        if (tokens.length >= MAX_TOKENS) return; // pool full: the Vault still onboards, just without a pool seat
         address t = IOrbitalVault(vault).token();
         tokens.push(t);
         _index[t] = tokens.length;
@@ -211,7 +212,7 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         uint256 n = tokens.length;
         for (uint256 i; i < n; i++) {
             address ti = tokens[i];
-            if (reserveOf[ti] <= liquidityOf[ti] || IOrbitalVault(vaultOf[ti]).isFrozen()) continue;
+            if (reserveOf[ti] <= liquidityOf[ti] || !IOrbitalVault(vaultOf[ti]).canSettleOut()) continue;
             for (uint256 j; j < n && reserveOf[ti] > liquidityOf[ti]; j++) {
                 address tj = tokens[j];
                 if (reserveOf[tj] >= liquidityOf[tj] || IOrbitalVault(vaultOf[tj]).isFrozen()) continue;
@@ -249,6 +250,8 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         _vault(tokenOut);
         if (IOrbitalVault(vaultOf[tokenIn]).isFrozen()) revert FrozenToken(tokenIn);
         if (IOrbitalVault(vaultOf[tokenOut]).isFrozen()) revert FrozenToken(tokenOut);
+        // Only tokens with liquidity sit on the sphere (an unfunded token would trade at a fake price).
+        if (liquidityOf[tokenIn] == 0 || liquidityOf[tokenOut] == 0 || radius == 0) revert InsufficientLiquidity();
         uint256 ai = radius - (reserveOf[tokenIn] + virtualOffset);
         uint256 aj = radius - (reserveOf[tokenOut] + virtualOffset);
         if (exactIn) (amountIn, amountOut) = (amount, OrbitalMath.outGivenIn(ai, aj, amount));
@@ -296,11 +299,14 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         v = vaultOf[token];
     }
 
-    /// Re-fit the sphere to the current reserves: V = (C−1)·L/N, r through X = x + V.
+    /// Re-fit the sphere to the funded tokens' reserves: V = (C−1)·L/N, r through X = x + V. Registered tokens
+    /// without liquidity stay off the sphere, so spam registrations can't push it off-curve.
     function _resize() internal {
-        uint256 n = tokens.length;
+        uint256 n;
         uint256 total;
-        for (uint256 i; i < n; i++) {
+        for (uint256 i; i < tokens.length; i++) {
+            if (liquidityOf[tokens[i]] == 0) continue;
+            n++;
             total += reserveOf[tokens[i]];
         }
         if (n < 2 || total == 0) {
@@ -309,8 +315,10 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         }
         uint256 v = (CONCENTRATION - 1) * total / n;
         uint256[] memory X = new uint256[](n);
-        for (uint256 i; i < n; i++) {
-            X[i] = reserveOf[tokens[i]] + v;
+        uint256 k;
+        for (uint256 i; i < tokens.length; i++) {
+            if (liquidityOf[tokens[i]] == 0) continue;
+            X[k++] = reserveOf[tokens[i]] + v;
         }
         virtualOffset = v;
         radius = OrbitalMath.radius(X);

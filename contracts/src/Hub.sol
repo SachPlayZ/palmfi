@@ -346,7 +346,8 @@ contract Hub is IReceiver {
             if (reject != 0) return _reject(reportId, reject);
             emit Flagged(r.vault, r.requestId, r.reasonCodes, dest);
             _freeze(r.vault, r.reasonCodes);
-            if (dest != address(0) && statusOf[dest] == T.STATUS_NONE) {
+            // Network-wide block only on a verified Vault's FLAG, so a throwaway org can't blocklist anyone.
+            if (dest != address(0) && statusOf[dest] == T.STATUS_NONE && verified[r.vault]) {
                 uint64 until = uint64(block.timestamp) + BLOCK_TTL;
                 blockedUntil[dest] = until;
                 emit Blocked(dest, r.vault, until);

@@ -129,6 +129,8 @@ contract QueuedLaneTest is NetworkTest {
 
     function test_flag_freezesForfeitsBondAndBlocks() public {
         uint256 id = _request(3_000e6);
+        vm.prank(deployer);
+        hub().setVerified(address(v), true);
         flag(v, id, T.UNUSUAL_AMOUNT | T.OFF_HOURS | T.NEW_DESTINATION);
         assertEq(v.getRequest(id).state, T.REQ_FLAGGED);
         assertEq(hub().statusOf(address(v)), T.STATUS_FROZEN);

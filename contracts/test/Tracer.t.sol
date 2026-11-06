@@ -90,6 +90,8 @@ contract TracerTest is NetworkTest {
         depositUsdc(v, w[0], 1_000e6);
         vm.prank(w[0]);
         uint256 id = v.requestUnwrap(900e6, attacker);
+        vm.prank(deployer);
+        hub().setVerified(address(v), true); // only a verified Vault's FLAG blocklists network-wide
         flag(v, id, T.BLOCKLISTED_DEST);
         assertTrue(hub().isBlocked(attacker));
         assertEq(hub().statusOf(address(v)), T.STATUS_FROZEN);

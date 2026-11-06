@@ -62,7 +62,7 @@ export const CHANGE_LABEL: Record<number, string> = {
   9: "Unfreeze",
   10: "Migrate to Recovery vault",
 };
-/** Timelock after a majority (seconds): removals, unfreeze and migrate apply at once. */
+/** Timelock after a majority (seconds): removals, unfreeze and migrate apply at once and can't be cancelled by one wallet. */
 export const CHANGE_TIMELOCK: Record<number, number> = { 1: 48 * 3600, 2: 0, 3: 48 * 3600, 4: 48 * 3600, 5: 48 * 3600, 6: 48 * 3600, 7: 7 * 86400, 8: 7 * 86400, 9: 0, 10: 0 };
 
 export const BOND = 1_000_000n; // 1 USDC, escrowed as burned Protected tokens

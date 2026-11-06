@@ -27,6 +27,8 @@ abstract contract VaultBase {
     uint256 public constant MIN_WALLETS = 3;
     /// Executed outflows kept as the onchain baseline the Sentinel scores against.
     uint256 public constant HISTORY = 32;
+    /// Longest delay any setting may impose, so every request can still execute inside REQUEST_TTL.
+    uint32 public constant MAX_DELAY_LIMIT = 5 days;
 
     struct Request {
         address destination; // outside address (UNWRAP) or payee Vault (PAYMENT)
@@ -77,6 +79,8 @@ abstract contract VaultBase {
     error NotTightening();
     error BadKind();
     error ZeroAmount();
+    error BadLimits();
+    error NotCancellable();
 
     IVaultFactory public factory;
     IHub public hub;
@@ -211,6 +215,12 @@ abstract contract VaultBase {
         _wallets.push(w);
     }
 
+    /// Floor ≤ CapDelay ≤ MaxDelay ≤ MAX_DELAY_LIMIT (a single wallet can't tighten requests past their TTL).
+    function _checkLimits(uint32 floor_, uint32 max_, uint32 capDelay_) internal pure {
+        if (floor_ == 0 || floor_ > capDelay_ || capDelay_ > max_ || max_ > MAX_DELAY_LIMIT) revert BadLimits();
+    }
+
+    /// A removed wallet's Protected tokens move to the receiving wallet (nobody else could ever move them).
     function _removeWallet(address w) internal {
         if (!isWallet[w]) revert NotWallet();
         if (_wallets.length <= MIN_WALLETS) revert TooFewWallets();
@@ -222,6 +232,11 @@ abstract contract VaultBase {
                 break;
             }
         }
+        uint256 b = ProtectedToken(token).balanceOf(w);
+        if (b > 0) {
+            ProtectedToken(token).burn(w, b);
+            ProtectedToken(token).mint(_wallets[0], b);
+        }
     }
 
     function _migrate() internal {
@@ -232,8 +247,10 @@ abstract contract VaultBase {
             uint256 b = t.balanceOf(_wallets[j]);
             if (b > 0) t.burn(_wallets[j], b);
         }
+        // Tokens still outside the wallets (pool, settlement) stay backed, so other orgs can settle them later.
         uint256 bal = IERC20(usdc).balanceOf(address(this));
-        if (bal > 0) IERC20(usdc).safeTransfer(recoveryVault, bal);
+        uint256 keep = t.totalSupply();
+        if (bal > keep) IERC20(usdc).safeTransfer(recoveryVault, bal - keep);
         hub.vaultMigrated(recoveryVault);
     }
 }

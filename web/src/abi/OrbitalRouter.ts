@@ -125,6 +125,11 @@ export const orbitalRouterAbi = [
   },
   {
     "type": "error",
+    "name": "BadRecipient",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "OnlyPoolManager",
     "inputs": []
   },

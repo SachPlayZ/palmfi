@@ -8,7 +8,7 @@ import {BalanceDelta, BalanceDeltaLibrary} from "@uniswap/v4-core/src/types/Bala
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
-import {OrbitalHook, IERC20Min} from "./OrbitalHook.sol";
+import {OrbitalHook, IERC20Min, IOrbitalVault} from "./OrbitalHook.sol";
 
 /// Minimal v4 router for the Orbital pool (Universal Router is unverified on Arc, brief §8.5). The hook trusts
 /// only this router's `msgSender()`: the wallet that called `swap`, whose Vault the swap-in is charged to.
@@ -23,6 +23,7 @@ contract OrbitalRouter is IUnlockCallback {
 
     error OnlyPoolManager();
     error Slippage(uint256 amountIn, uint256 amountOut);
+    error BadRecipient();
 
     constructor(IPoolManager pm, OrbitalHook hook_) {
         poolManager = pm;
@@ -40,6 +41,8 @@ contract OrbitalRouter is IUnlockCallback {
         external
         returns (uint256 amountIn, uint256 amountOut)
     {
+        // Paid to a wallet of the payee Vault, never to the Vault contract or the pool, where tokens would strand.
+        if (!IOrbitalVault(hook.vaultOf(tokenOut)).isWallet(recipient)) revert BadRecipient();
         _locker = msg.sender;
         (amountIn, amountOut) = abi.decode(
             poolManager.unlock(abi.encode(msg.sender, tokenIn, tokenOut, amount, exactIn, recipient)), (uint256, uint256)
