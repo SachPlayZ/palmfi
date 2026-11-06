@@ -6,7 +6,7 @@ import { useReadContract, useReadContracts } from "wagmi";
 import { orbitalHookAbi, orbitalRouterAbi, vaultAbi } from "@/abi";
 import { deployments } from "@/lib/deployments";
 import { arcTestnet } from "@/lib/network";
-import { STATUS, STATUS_LABEL, formatUsd } from "@/lib/palm";
+import { KIND, REQ, STATUS, STATUS_LABEL, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { hubAbi } from "@/abi";
@@ -66,10 +66,19 @@ export function PoolPayCard({ v }: { v: VaultView }) {
   const myBal = v.balances.find((b) => eq(b.wallet, roles.address))?.balance ?? 0n;
   const needsApprove = maxIn !== undefined && (allowance.data ?? 0n) < maxIn;
   const self = eq(d.address, v.vault);
-  const overBudget = amountIn !== undefined && v.s ? amountIn > v.s.availableBudget : false;
+  // CRE live: the swap must consume a pool-swap clearance this wallet requested and the Sentinel cleared.
+  const clearances = v.requests.filter((r) => r.kind === KIND.SWAP && r.state === REQ.PENDING && eq(r.requester, roles.address));
+  const cleared = maxIn !== undefined ? clearances.find((r) => r.executable && r.amount >= maxIn) : undefined;
+  const waiting = clearances.find((r) => !r.executable);
+  const needsClearance = v.creLive && !cleared;
+  const overBudget = !v.creLive && amountIn !== undefined && v.s ? amountIn > v.s.availableBudget : false;
 
   async function go() {
     if (!myToken || !p.token || !p.receiver || !amt || !maxIn) return;
+    if (needsClearance) {
+      if (await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "requestSwap", args: [maxIn] }, "Request clearance (CRE scores it)")) v.refetch();
+      return;
+    }
     if (needsApprove) return tx.send({ address: myToken, abi: erc20Abi, functionName: "approve", args: [deployments.router!, maxUint256] }, `Approve ${v.symbol}`);
     if (await tx.send({ address: deployments.router!, abi: orbitalRouterAbi, functionName: "swap", args: [myToken, p.token, amt, false, maxIn, p.receiver] }, "Pay via Orbital pool"))
       setAmount("");
@@ -105,10 +114,15 @@ export function PoolPayCard({ v }: { v: VaultView }) {
           <p className="text-sm">
             You pay <span className="tabular font-medium">{fmtAmount(amountIn)} {v.symbol}</span> ({formatUsd(amountIn - (amt ?? 0n))} pool spread)
             {overBudget && <span className="block text-xs text-amber-700 dark:text-amber-400">Over the Instant budget: queue a payment from Send instead.</span>}
+            {v.creLive && (
+              <span className="block text-xs text-[var(--subtle)]">
+                {cleared ? "Cleared by CRE: pay now." : waiting ? `Clearance #${waiting.id} is waiting on its delay or vote.` : "CRE checks every payment first: request clearance, then pay (routine amounts clear at once)."}
+              </span>
+            )}
           </p>
         )}
-        <Button onClick={go} disabled={!roles.isWallet || !d.isVault || self || !amt || amountIn === undefined || overBudget || myBal < (maxIn ?? 0n) || p.status === STATUS.FROZEN || tx.busy}>
-          {needsApprove ? `Approve ${v.symbol}` : "Pay via Orbital pool"}
+        <Button onClick={go} disabled={!roles.isWallet || !d.isVault || self || !amt || amountIn === undefined || overBudget || myBal < (maxIn ?? 0n) || p.status === STATUS.FROZEN || (needsClearance && !!waiting) || tx.busy}>
+          {needsClearance ? (waiting ? "Waiting for clearance…" : "Request clearance") : needsApprove ? `Approve ${v.symbol}` : "Pay via Orbital pool"}
         </Button>
         <TxStatus state={tx.state} />
       </div>

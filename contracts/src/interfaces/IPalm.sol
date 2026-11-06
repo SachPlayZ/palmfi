@@ -28,6 +28,8 @@ interface IHub {
     function statusOf(address vault) external view returns (uint8);
     function isBlocked(address account) external view returns (bool);
     function isVault(address vault) external view returns (bool);
+    /// CRE has written a heartbeat recently: every outflow must go through a scored request.
+    function creLive() external view returns (bool);
 
     // Vault → Hub event router
     function emitRequestQueued(

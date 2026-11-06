@@ -122,7 +122,7 @@ describe("assess", () => {
     const big = assess(ctx({ amount: USD(30_000) }, { history: [] }));
     expect(ok.action).toBe("DELAY");
     expect(hours(ok.delay)).toBeLessThan(3);
-    expect(big.score).toBeGreaterThan(ok.score + 4000);
+    expect(big.score).toBeGreaterThan(ok.score + 3000); // 10× the threshold: log2(10) bits past it
   });
 
   test("no history and no profile → MaxDelay (unsure → slow)", () => {
@@ -151,4 +151,50 @@ describe("assess", () => {
     const r2 = assess({ ...c, history: [...c.history].reverse() });
     expect(r2).toEqual(r1);
   });
+
+  // ---------- every outflow scored: quiet lane + smurfing ----------
+
+  test("within the onboarding threshold: zero amount surprise", () => {
+    const r = assess(ctx({ amount: USD(3000) }));
+    expect(r.terms.amount).toBe(0);
+    expect(r.reasonCodes & UNUSUAL_AMOUNT).toBe(0n);
+  });
+
+  test("quiet small payment to a regular payee in hours → zero delay", () => {
+    const r = assess(ctx({ amount: USD(200) }));
+    expect(r.action).toBe("DELAY");
+    expect(r.delay).toBe(0n);
+  });
+
+  test("small but surprising (new destination) still waits", () => {
+    const r = assess(ctx({ amount: USD(200), destination: a(999) }, { knownDestination: false }));
+    expect(r.reasonCodes & NEW_DESTINATION).toBe(NEW_DESTINATION);
+    expect(r.delay).toBeGreaterThanOrEqual(15n * 60n);
+  });
+
+  test("past the threshold the amount surprise starts at ~0 and rises smoothly", () => {
+    const s = [3100, 4500, 6000, 12_000, 24_000].map((x) => assess(ctx({ amount: USD(x) }, { history: [] })).terms.amount);
+    expect(s[0]).toBeLessThan(100); // just past the threshold: barely surprising
+    for (let i = 1; i < s.length; i++) expect(s[i]).toBeGreaterThan(s[i - 1]);
+    expect(s[3] - s[2]).toBeCloseTo(1000, -2); // one bit per doubling (cold start)
+  });
+
+  test("smurfing: a burst of small transfers loses the quiet lane, then FLAGs", () => {
+    const now = at(0, 11);
+    const smurf = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({ wallet: W[0], destination: DEST[1], amount: USD(50), timestamp: now - BigInt(i + 1) * 120n }));
+    const h = payrollHistory();
+    const few = assess(ctx({ amount: USD(50), destination: DEST[1] }, { history: [...h.slice(4), ...smurf(4)] }));
+    expect(few.reasonCodes & VELOCITY).toBe(VELOCITY);
+    expect(few.delay).toBeGreaterThan(0n);
+    const many = assess(ctx({ amount: USD(50), destination: DEST[1] }, { history: [...h.slice(14), ...smurf(14)] }), { k: 2500, sFlag: 18000 });
+    expect(many.action).toBe("FLAG");
+  });
+
+  test("pool swap requests carry no destination surprise (the hook isn't the payee)", () => {
+    const r = assess(ctx({ amount: USD(200), kind: 2, destination: a(4242) }, { knownDestination: false }));
+    expect(r.terms.dest).toBe(0);
+    expect(r.reasonCodes & NEW_DESTINATION).toBe(0n);
+  });
 });
+

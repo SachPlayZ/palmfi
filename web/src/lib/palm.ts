@@ -16,7 +16,7 @@ export const REQ_LABEL: Record<number, string> = {
   5: "Flagged",
   6: "Cancelled",
 };
-export const KIND = { UNWRAP: 0, PAYMENT: 1 } as const;
+export const KIND = { UNWRAP: 0, PAYMENT: 1, SWAP: 2 } as const;
 
 /** Reason codes bitmap (brief §7.2), bit index → [code, human explanation]. */
 export const REASON_CODES: ReadonlyArray<readonly [number, string, string]> = [

@@ -97,6 +97,7 @@ export function useVault(vault: Address | undefined) {
       { address: deployments.hub, abi: hubAbi, functionName: "lastHeartbeat", chainId },
       { address: deployments.hub, abi: hubAbi, functionName: "nameOf", args: [vault!], chainId },
       { address: deployments.hub, abi: hubAbi, functionName: "verified", args: [vault!], chainId },
+      { address: deployments.hub, abi: hubAbi, functionName: "creLive", chainId },
     ],
     query: { enabled: enabled && !!deployments.hub, refetchInterval: REFRESH },
   });
@@ -113,6 +114,9 @@ export function useVault(vault: Address | undefined) {
   const lastHeartbeat = tail?.[1]?.result as bigint | undefined;
   const name = (tail?.[2]?.result as string | undefined) || undefined;
   const verified = Boolean(tail?.[3]?.result);
+  // CRE live (fresh heartbeat): every outflow is a scored request; small quiet ones clear at zero delay.
+  // An older Hub without creLive reads as false: the direct instant lane, as before.
+  const creLive = Boolean(tail?.[4]?.result);
 
   const wallets = s?.wallets ?? [];
   const token = s?.token;
@@ -185,6 +189,7 @@ export function useVault(vault: Address | undefined) {
     name,
     verified,
     lastHeartbeat,
+    creLive,
     symbol,
     balances,
     totalTokens: balances.reduce((a, b) => a + b.balance, 0n),
