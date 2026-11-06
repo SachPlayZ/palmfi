@@ -3,45 +3,43 @@ pragma solidity 0.8.29;
 
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Vault} from "../src/Vault.sol";
-import {VaultBase} from "../src/VaultBase.sol";
 import {ProtectedToken} from "../src/tokens/ProtectedToken.sol";
-import {PalmTypes} from "../src/libraries/PalmTypes.sol";
 
-/// Ticket #5: Protected tokens move only between own Hot wallets and PoolManager custody (ADR-0006).
+/// Protected tokens move only between the Vault's own wallets and PoolManager custody (ADR-0006).
 contract WhitelistTest is NetworkTest {
     Vault v;
     ProtectedToken t;
 
     function setUp() public override {
         super.setUp();
-        v = onboardAlice();
-        t = usdcToken(v);
-        depositUsdc(v, hotWallet, 10e6);
+        v = onboard("nvidia", 3);
+        t = tokenOf(v);
+        depositUsdc(v, w[0], 10e6);
     }
 
-    function test_transferBetweenOwnHotWalletsSucceeds() public {
-        vm.prank(hotWallet);
-        t.transfer(hotWallet2, 4e6);
-        assertEq(t.balanceOf(hotWallet2), 4e6);
+    function test_transferBetweenOwnWalletsSucceeds() public {
+        vm.prank(w[0]);
+        t.transfer(w[1], 4e6);
+        assertEq(t.balanceOf(w[1]), 4e6);
     }
 
     function test_transferToOutsiderReverts() public {
-        vm.prank(hotWallet);
-        vm.expectRevert(abi.encodeWithSelector(ProtectedToken.TransferNotAllowed.selector, hotWallet, attacker));
+        vm.prank(w[0]);
+        vm.expectRevert(abi.encodeWithSelector(ProtectedToken.TransferNotAllowed.selector, w[0], attacker));
         t.transfer(attacker, 1e6);
     }
 
     function test_transferFromWithApprovalStillEnforcesWhitelist() public {
-        vm.prank(hotWallet);
+        vm.prank(w[0]);
         t.approve(attacker, type(uint256).max);
         vm.prank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(ProtectedToken.TransferNotAllowed.selector, hotWallet, attacker));
-        t.transferFrom(hotWallet, attacker, 1e6);
+        vm.expectRevert(abi.encodeWithSelector(ProtectedToken.TransferNotAllowed.selector, w[0], attacker));
+        t.transferFrom(w[0], attacker, 1e6);
     }
 
-    function test_poolManagerCustodyOnlyReleasesToHotWallets() public {
-        vm.prank(hotWallet);
-        t.transfer(ext.poolManager, 5e6); // into the real PoolManager: allowed
+    function test_poolManagerCustodyOnlyReleasesToOwnWallets() public {
+        vm.prank(w[0]);
+        t.transfer(ext.poolManager, 5e6);
         assertEq(t.balanceOf(ext.poolManager), 5e6);
 
         vm.prank(ext.poolManager);
@@ -49,54 +47,41 @@ contract WhitelistTest is NetworkTest {
         t.transfer(attacker, 1e6);
 
         vm.prank(ext.poolManager);
-        t.transfer(hotWallet2, 1e6);
-        assertEq(t.balanceOf(hotWallet2), 1e6);
+        t.transfer(w[1], 1e6);
+        assertEq(t.balanceOf(w[1]), 1e6);
+    }
+
+    function test_otherOrgsWalletCannotHoldToken() public {
+        address otherOrgWallet = makeAddr("pal0");
+        factory().createVault("palantir", config(_three(otherOrgWallet)));
+        vm.prank(ext.poolManager);
+        vm.expectRevert();
+        t.transfer(otherOrgWallet, 1e6);
     }
 
     function test_behavesAsStandardErc20ForWallets() public view {
         assertEq(t.decimals(), 6);
         assertEq(t.totalSupply(), 10e6);
-        assertEq(IERC20Like(address(t)).balanceOf(hotWallet), 10e6);
-    }
-
-    function test_hotWalletAddedOnlyByRecoveryKeyAfterTimelock() public {
-        address newHot = makeAddr("newHot");
-        vm.prank(hotWallet);
-        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
-        mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
-
-        vm.prank(recoveryKey);
-        uint256 id = mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
-        vm.prank(recoveryKey);
-        vm.expectRevert(VaultBase.TimelockActive.selector);
-        mod(v).executeChange(id);
-        skip(48 hours);
-        vm.prank(recoveryKey);
-        mod(v).executeChange(id);
-        assertTrue(v.isHotWallet(newHot));
-        vm.prank(hotWallet);
-        t.transfer(newHot, 1e6);
-    }
-
-    function test_removingHotWalletIsInstant() public {
-        vm.prank(hotWallet);
-        mod(v).removeHotWallet(hotWallet2);
-        assertFalse(v.isHotWallet(hotWallet2));
-        vm.prank(hotWallet);
-        vm.expectPartialRevert(ProtectedToken.TransferNotAllowed.selector);
-        t.transfer(hotWallet2, 1e6);
+        assertEq(IERC20Like(address(t)).balanceOf(w[0]), 10e6);
     }
 
     /// Reserves always cover supply (fuzzed over deposit / unwrap / internal moves).
     function testFuzz_reservesCoverSupply(uint96 dep, uint96 out, uint96 moved) public {
         dep = uint96(bound(dep, 1, 1_000e6));
-        depositUsdc(v, hotWallet2, dep);
+        depositUsdc(v, w[1], dep);
         moved = uint96(bound(moved, 0, dep));
-        vm.prank(hotWallet2);
-        t.transfer(hotWallet, moved);
+        vm.prank(w[1]);
+        t.transfer(w[0], moved);
         out = uint96(bound(out, 1, 4e6));
-        vm.prank(hotWallet);
-        v.unwrap(ext.usdc, out, payee, false);
-        assertGe(IERC20Like(ext.usdc).balanceOf(address(v)), t.totalSupply());
+        vm.prank(w[0]);
+        v.unwrap(out, outsider);
+        assertGe(usdcBalance(address(v)), t.totalSupply());
+    }
+
+    function _three(address first) internal returns (address[] memory out) {
+        out = new address[](3);
+        out[0] = first;
+        out[1] = makeAddr("pal1");
+        out[2] = makeAddr("pal2");
     }
 }

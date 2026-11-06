@@ -5,10 +5,10 @@
  *
  *   bun scripts/simulate.ts                # enabled fixtures only
  *   bun scripts/simulate.ts --all          # every fixture that can run (log fixtures need evmTxHash)
- *   bun scripts/simulate.ts --broadcast    # send real Sepolia txs through the MockKeystoneForwarder
+ *   bun scripts/simulate.ts --broadcast    # send real Arc testnet txs through the MockKeystoneForwarder
  *   bun scripts/simulate.ts 01-missed-log  # named fixtures
  *
- * Logs go to cre/fixtures/logs/<fixture>.log. Requires the `cre` CLI on PATH and SEPOLIA_RPC_URL; without
+ * Logs go to cre/fixtures/logs/<fixture>.log. Requires the `cre` CLI on PATH and ARC_RPC_URL; without
  * the CLI it prints what it would run and exits 0, so CI stays green before CRE access exists.
  */
 import { readdirSync, mkdirSync, writeFileSync } from "node:fs";

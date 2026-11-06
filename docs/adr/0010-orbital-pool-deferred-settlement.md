@@ -1,0 +1,8 @@
+# Cross-org payments go through one Orbital pool; inventory settles later
+
+All Protected tokens trade in one N-token Orbital AMM (Paradigm, June 2025) behind a Uniswap v4 hook; each pair PoolKey is a facade over shared reserves. Each org LPs its own token. A payer's swap-in is charged to its budget/queue like an Unwrap. Foreign inventory (tokens only their issuer can redeem) is settled vault-to-vault by the Reconciler or on LP withdrawal, so an LP only ever gets its own token back. A frozen issuer's token halts both swaps and settlement, which Orbital treats as a depeg bounded by tick choice. This replaces burn-and-mint (ADR-0001) to get one composable Uniswap route. The cost is a contagion window between swap and settlement, plus the hardest math in the build (fallback ladder: ticks → single sphere → constant-sum).
+
+
+## Status (ticks)
+
+Top rung of the fallback ladder is implemented: `contracts/src/orbital/OrbitalTicks.sol`. Ten ticks named by the depeg they tolerate (price floor 99.9% … 25%, plus the full sphere); interior ticks consolidate into one sphere, boundary ticks onto a circle, and the pool obeys the torus invariant `(w − cS)² + (α − cB)² = (cP)²` (c fits in closed form; swaps are the first root of the same invariant from the current state, with tick crossings re-classified at every probe). When every tick sits on its boundary the pool refuses further flow toward the depegging token, which bounds its LPs' exposure. Reference model: `contracts/test/vectors/orbital_ticks_ref.py`; Foundry replays its vectors and fuzzes the invariant. Differences from the paper: a 20× virtual offset is kept so unevenly funded (single-sided) pools stay on the curve, so tick caps are price bands on virtual reserves; the solver is bisection, not Newton.

@@ -1,27 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { REQ } from "./palm";
-import { requestTimeline } from "./requests";
+import { requestTimeline, voteProgress } from "./requests";
 
-const base = { createdAt: 1000n, executableAt: 0n, executable: false, secondFactor: false, recoveryApproved: false };
+const base = { state: REQ.PENDING, createdAt: 1000n, executableAt: 1000n + 3600n, executable: false, scored: false, fastTracked: false };
 
 describe("requestTimeline", () => {
-  it("counts down an Individual's fail-open path while Pending", () => {
-    expect(requestTimeline({ ...base, state: REQ.PENDING }, false, 300, 1000).text).toContain("3d 0h");
+  it("unscored → MaxDelay wording", () => {
+    expect(requestTimeline(base, 1000).text).toContain("Not scored yet");
   });
-  it("shows the Institution fail-closed requirements", () => {
-    const t = requestTimeline({ ...base, state: REQ.PENDING, secondFactor: true }, true, 300, 1100).text;
-    expect(t).toContain("Payout approval ✓");
-    expect(t).toContain("needs Recovery key");
-    expect(t).toContain("Floor in 3m 20s");
+  it("scored → Sentinel delay countdown", () => {
+    expect(requestTimeline({ ...base, scored: true }, 1000).text).toBe("Delay set by the Sentinel: executable in 1h 0m");
   });
-  it("asks for a Second factor on an unconfirmed HOLD", () => {
-    expect(requestTimeline({ ...base, state: REQ.HELD }, false, 300, 1100).needs2fa).toBe(true);
+  it("fast-tracked and ready states", () => {
+    expect(requestTimeline({ ...base, fastTracked: true }, 1000).text).toContain("Fast-tracked");
+    expect(requestTimeline({ ...base, executable: true }, 9000).ready).toBe(true);
   });
-  it("counts down to executableAt once Cleared", () => {
-    expect(requestTimeline({ ...base, state: REQ.CLEARED, executableAt: 1300n }, false, 300, 1100).text).toBe("Executable in 3m 20s");
+  it("expired after 7 days", () => {
+    expect(requestTimeline(base, 1000 + 7 * 86400 + 1).expired).toBe(true);
   });
-  it("marks expiry after 7 days and terminal states", () => {
-    expect(requestTimeline({ ...base, state: REQ.HELD }, false, 300, 1000 + 7 * 86400 + 1).expired).toBe(true);
-    expect(requestTimeline({ ...base, state: REQ.FLAGGED }, false, 300, 1100).text).toBe("Flagged");
+  it("closed states show their label", () => {
+    expect(requestTimeline({ ...base, state: REQ.VETOED }, 0).text).toBe("Vetoed");
+  });
+});
+
+describe("voteProgress", () => {
+  it("5 Voters: 3 NO of the other 4 veto, 3 YES fast-track", () => {
+    expect(voteProgress({ voterCount: 5, yes: 1, no: 2 })).toEqual({ veto: { have: 2, need: 3 }, fastTrack: { have: 1, need: 3 } });
   });
 });

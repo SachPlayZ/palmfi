@@ -4,17 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
-import { sepolia } from "wagmi/chains";
 import type { ReactNode } from "react";
 import { deployments, isDeployed } from "@/lib/deployments";
+import { arcTestnet } from "@/lib/network";
 import { Notice } from "./ui";
 
 const links = [
   { href: "/vaults", label: "Vaults" },
   { href: "/onboard", label: "Onboard" },
   { href: "/pay", label: "Pay by name" },
-  { href: "/institution", label: "Treasury" },
-  { href: "/approver", label: "Approver" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -44,12 +42,12 @@ export function Shell({ children }: { children: ReactNode }) {
         <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
       </header>
       {!isDeployed(deployments) && <NotDeployed />}
-      {isConnected && chainId !== sepolia.id && (
-        <Notice tone="amber">Your wallet is on another network. palmfi runs on Ethereum Sepolia; transactions will ask to switch.</Notice>
+      {isConnected && chainId !== arcTestnet.id && (
+        <Notice tone="amber">Your wallet is on another network. palmfi runs on Arc testnet; transactions will ask to switch.</Notice>
       )}
       <main className="flex flex-col gap-5">{children}</main>
       <footer className="mt-auto pt-8 text-xs text-[var(--subtle)]">
-        Live on Ethereum Sepolia. Your keys can be stolen; your money can&apos;t leave faster than you can say no.
+        Live on Arc testnet (USDC gas). Your keys can be stolen; your money can&apos;t leave faster than you can say no.
       </footer>
     </div>
   );
@@ -59,8 +57,7 @@ export function NotDeployed() {
   return (
     <Notice tone="amber">
       <strong>Not deployed yet.</strong> No palmfi contract addresses are configured. Run the deploy script so
-      deployments/sepolia.json exists, then <code>pnpm sync:deployments</code> (or set NEXT_PUBLIC_PALMFI_FACTORY,
-      _HUB, _REGISTRY, _APPROVAL_BOOK). ENS lookups still work.
+      deployments/arc.json exists, then <code>pnpm sync:deployments</code>.
     </Notice>
   );
 }

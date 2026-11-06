@@ -2,11 +2,7 @@
 export const vaultAbi = [
   {
     "type": "fallback",
-    "stateMutability": "payable"
-  },
-  {
-    "type": "receive",
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -23,7 +19,7 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "FAIL_OPEN_DELAY",
+    "name": "HISTORY",
     "inputs": [],
     "outputs": [
       {
@@ -37,6 +33,45 @@ export const vaultAbi = [
   {
     "type": "function",
     "name": "LONG_TIMELOCK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_DELAY_LIMIT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_PENDING_PER_WALLET",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_WALLETS",
     "inputs": [],
     "outputs": [
       {
@@ -75,46 +110,7 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "SLIPPAGE_NORMAL_BPS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "SLIPPAGE_VOLATILE_BPS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "STALENESS_MARGIN",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "applyVerdict",
+    "name": "applyDelay",
     "inputs": [
       {
         "name": "id",
@@ -127,9 +123,14 @@ export const vaultAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "verdict",
-        "type": "uint8",
-        "internalType": "uint8"
+        "name": "delay",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "score",
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
         "name": "reasonCodes",
@@ -139,12 +140,46 @@ export const vaultAbi = [
     ],
     "outputs": [
       {
-        "name": "reject",
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "applyFlag",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "score",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "reasonCodes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
         "type": "uint8",
         "internalType": "uint8"
       },
       {
-        "name": "destination",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
@@ -153,67 +188,7 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "approvalBook",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract ApprovalBook"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "approver",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "assets",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "feed",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "heartbeat",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "decimals",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "availableBudgetUsd",
+    "name": "availableBudget",
     "inputs": [],
     "outputs": [
       {
@@ -252,6 +227,25 @@ export const vaultAbi = [
   },
   {
     "type": "function",
+    "name": "bondOf",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "budget24h",
     "inputs": [],
     "outputs": [
@@ -278,6 +272,19 @@ export const vaultAbi = [
   },
   {
     "type": "function",
+    "name": "canSettleOut",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "cancel",
     "inputs": [
       {
@@ -291,34 +298,34 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "confirm",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "sig",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "defaultReceiver",
+    "name": "capDelay",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "chargeOutflow",
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -344,11 +351,6 @@ export const vaultAbi = [
     "name": "deposit",
     "inputs": [
       {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -364,16 +366,22 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "depositETH",
+    "name": "destinationCount",
     "inputs": [
       {
-        "name": "to",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "payable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -429,16 +437,10 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "fullDelay",
+    "name": "freeze",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -457,11 +459,6 @@ export const vaultAbi = [
         "internalType": "struct VaultBase.Request",
         "components": [
           {
-            "name": "asset",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "destination",
             "type": "address",
             "internalType": "address"
@@ -473,11 +470,6 @@ export const vaultAbi = [
           },
           {
             "name": "amount",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "usdValue",
             "type": "uint128",
             "internalType": "uint128"
           },
@@ -497,19 +489,39 @@ export const vaultAbi = [
             "internalType": "uint8"
           },
           {
-            "name": "asWeth",
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "fastTracked",
             "type": "bool",
             "internalType": "bool"
           },
           {
-            "name": "secondFactor",
+            "name": "scored",
             "type": "bool",
             "internalType": "bool"
           },
           {
-            "name": "recoveryApproved",
-            "type": "bool",
-            "internalType": "bool"
+            "name": "voterCount",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "yes",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "no",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "score",
+            "type": "uint32",
+            "internalType": "uint32"
           },
           {
             "name": "reasonCodes",
@@ -522,19 +534,6 @@ export const vaultAbi = [
             "internalType": "bytes32"
           }
         ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "guardian",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -554,54 +553,61 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "hookUnwrap",
+    "name": "hasVoted",
     "inputs": [
       {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "swapper",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "hookWrap",
+    "name": "hasVotedChange",
     "inputs": [
       {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "hotWallets",
+    "name": "historyCount",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -629,24 +635,9 @@ export const vaultAbi = [
         "internalType": "struct PalmTypes.VaultConfig",
         "components": [
           {
-            "name": "owner",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "hotWallets",
+            "name": "wallets",
             "type": "address[]",
             "internalType": "address[]"
-          },
-          {
-            "name": "defaultReceiver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "guardian",
-            "type": "address",
-            "internalType": "address"
           },
           {
             "name": "recoveryKey",
@@ -657,21 +648,6 @@ export const vaultAbi = [
             "name": "recoveryVault",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "approver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "passkeyX",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "passkeyY",
-            "type": "bytes32",
-            "internalType": "bytes32"
           },
           {
             "name": "budget24h",
@@ -694,7 +670,12 @@ export const vaultAbi = [
             "internalType": "uint32"
           },
           {
-            "name": "fullDelay",
+            "name": "maxDelay",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "capDelay",
             "type": "uint32",
             "internalType": "uint32"
           },
@@ -731,32 +712,7 @@ export const vaultAbi = [
             "internalType": "address"
           },
           {
-            "name": "registry",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "weth",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "usdc",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "safetyFund",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "approvalBook",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "verifier",
             "type": "address",
             "internalType": "address"
           },
@@ -766,24 +722,9 @@ export const vaultAbi = [
             "internalType": "address"
           },
           {
-            "name": "underlyings",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "tokens",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "feeds",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "heartbeats",
-            "type": "uint32[]",
-            "internalType": "uint32[]"
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "defaultDelegates",
@@ -795,19 +736,6 @@ export const vaultAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "institution",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -868,7 +796,20 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "isHotWallet",
+    "name": "isFrozen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isWallet",
     "inputs": [
       {
         "name": "",
@@ -900,19 +841,13 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "marketModeOf",
-    "inputs": [
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "name": "maxDelay",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -929,29 +864,6 @@ export const vaultAbi = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "networkTransfer",
-    "inputs": [
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "payeeVault",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -994,59 +906,44 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "owner",
-    "inputs": [],
-    "outputs": [
+    "name": "pay",
+    "inputs": [
+      {
+        "name": "payeeVault",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "pendingOf",
+    "inputs": [
       {
         "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "passkeyX",
-    "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "passkeyY",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "paused",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "pendingCount",
+    "name": "pendingWalletAdds",
     "inputs": [],
     "outputs": [
       {
@@ -1059,32 +956,8 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "protectedToken",
+    "name": "receivePayment",
     "inputs": [
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "receiveNetworkTransfer",
-    "inputs": [
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "amount",
         "type": "uint256",
@@ -1122,26 +995,51 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "registry",
-    "inputs": [],
+    "name": "requestPayment",
+    "inputs": [
+      {
+        "name": "payeeVault",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requestSwap",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "requestUnwrap",
     "inputs": [
-      {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "amount",
         "type": "uint256",
@@ -1151,70 +1049,57 @@ export const vaultAbi = [
         "name": "destination",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "asWeth",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [
       {
-        "name": "id",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "safetyFund",
+    "name": "settleIn",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "settleOut",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "toVault",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "token",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "sensitivePending",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "underlyings",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address[]",
-        "internalType": "address[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "unfreezeNonce",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1224,11 +1109,6 @@ export const vaultAbi = [
     "name": "unwrap",
     "inputs": [
       {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -1237,11 +1117,6 @@ export const vaultAbi = [
         "name": "destination",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "asWeth",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -1301,62 +1176,70 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "valueUsd",
+    "name": "vote",
     "inputs": [
       {
-        "name": "underlying",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "usd",
+        "name": "id",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "stale",
+        "name": "yes",
         "type": "bool",
         "internalType": "bool"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "verifier",
-    "inputs": [],
-    "outputs": [
+    "name": "walletAddedAt",
+    "inputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract SecondFactorVerifier"
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "weth",
+    "name": "walletCount",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "address",
-        "internalType": "address"
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "wallets",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]",
+        "internalType": "address[]"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "error",
-    "name": "BadBond",
+    "name": "AlreadyVoted",
     "inputs": []
   },
   {
@@ -1366,7 +1249,7 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "BadSignature",
+    "name": "BadLimits",
     "inputs": []
   },
   {
@@ -1387,37 +1270,10 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "Degraded",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "DelegateNotApproved",
     "inputs": [
       {
         "name": "target",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "EthSendFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "FeedStale",
-    "inputs": [
-      {
-        "name": "asset",
         "type": "address",
         "internalType": "address"
       }
@@ -1430,12 +1286,17 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "NotExecutable",
+    "name": "NotCancellable",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "NotFactory",
+    "name": "NotEligible",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotExecutable",
     "inputs": []
   },
   {
@@ -1445,17 +1306,7 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "NotGuardian",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotHook",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotHotWallet",
     "inputs": []
   },
   {
@@ -1465,17 +1316,7 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "NotLoosening",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotRecoveryKey",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRegistry",
     "inputs": []
   },
   {
@@ -1485,10 +1326,15 @@ export const vaultAbi = [
   },
   {
     "type": "error",
+    "name": "NotWallet",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "OverBudget",
     "inputs": [
       {
-        "name": "usdValue",
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -1498,11 +1344,6 @@ export const vaultAbi = [
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "Paused",
-    "inputs": []
   },
   {
     "type": "error",
@@ -1522,23 +1363,12 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "SlippageExceeded",
-    "inputs": [
-      {
-        "name": "out",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "minOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "name": "TimelockActive",
+    "inputs": []
   },
   {
     "type": "error",
-    "name": "TimelockActive",
+    "name": "TooFewWallets",
     "inputs": []
   },
   {
@@ -1553,7 +1383,7 @@ export const vaultAbi = [
   },
   {
     "type": "error",
-    "name": "UnknownAsset",
+    "name": "UseRequest",
     "inputs": []
   },
   {
@@ -1580,7 +1410,7 @@ export const vaultAbi = [
     "inputs": [],
     "outputs": [
       {
-        "name": "wallets",
+        "name": "ws",
         "type": "address[]",
         "internalType": "address[]"
       },
@@ -1596,13 +1426,6 @@ export const vaultAbi = [
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "evacuate",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1639,14 +1462,29 @@ export const vaultAbi = [
             "internalType": "uint8"
           },
           {
-            "name": "eta",
+            "name": "done",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "voterCount",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "yes",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "createdAt",
             "type": "uint64",
             "internalType": "uint64"
           },
           {
-            "name": "done",
-            "type": "bool",
-            "internalType": "bool"
+            "name": "eta",
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "data",
@@ -1657,6 +1495,48 @@ export const vaultAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "history",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "out",
+        "type": "tuple[]",
+        "internalType": "struct PalmTypes.Outflow[]",
+        "components": [
+          {
+            "name": "wallet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "destination",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "timestamp",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "leave",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1673,20 +1553,6 @@ export const vaultAbi = [
         "internalType": "uint128"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "migrate",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "pause",
-    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1716,14 +1582,15 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "recoveryApprove",
-    "inputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "name": "recoveryMigrate",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recoveryUnfreeze",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1755,53 +1622,16 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "removeHotWallet",
-    "inputs": [
-      {
-        "name": "h",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "reserves",
     "inputs": [],
     "outputs": [
       {
-        "name": "u",
-        "type": "address[]",
-        "internalType": "address[]"
-      },
-      {
         "name": "held",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "supply",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "safeHarborMinOut",
-    "inputs": [
-      {
-        "name": "amountIn",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1810,40 +1640,205 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "safeHarborSwap",
+    "name": "scoringContext",
     "inputs": [
       {
-        "name": "amountIn",
+        "name": "id",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "route",
-        "type": "bytes",
-        "internalType": "bytes"
       }
     ],
     "outputs": [
       {
-        "name": "amountOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "ctx",
+        "type": "tuple",
+        "internalType": "struct VaultModule.ScoringContext",
+        "components": [
+          {
+            "name": "request",
+            "type": "tuple",
+            "internalType": "struct VaultBase.Request",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "requester",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "createdAt",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "executableAt",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "state",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "kind",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "fastTracked",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "scored",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "voterCount",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "yes",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "no",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "score",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "reasonCodes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "requestHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          },
+          {
+            "name": "history",
+            "type": "tuple[]",
+            "internalType": "struct PalmTypes.Outflow[]",
+            "components": [
+              {
+                "name": "wallet",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "timestamp",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "destinationCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "knownDestination",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "profile",
+            "type": "tuple",
+            "internalType": "struct VaultModule.Profile",
+            "components": [
+              {
+                "name": "bizStartHourUtc",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "bizEndHourUtc",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "usualMaxPayout",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "hardCap",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "floorDelay",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "maxDelay",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "capDelay",
+                "type": "uint32",
+                "internalType": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "configChangePending",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "requesterAddedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "requesterDelegation",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "walletCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setDefaultReceiver",
-    "inputs": [
-      {
-        "name": "h",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1860,7 +1855,12 @@ export const vaultAbi = [
         "internalType": "uint32"
       },
       {
-        "name": "full",
+        "name": "max_",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "capDelay_",
         "type": "uint32",
         "internalType": "uint32"
       }
@@ -1870,41 +1870,14 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "unfreeze",
+    "name": "voteChange",
     "inputs": [
       {
-        "name": "passkeySig",
-        "type": "bytes",
-        "internalType": "bytes"
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "unfreezeChallenge",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "unpause",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "voteMigrate",
-    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   }

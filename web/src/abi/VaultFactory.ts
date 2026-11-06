@@ -19,37 +19,7 @@ export const vaultFactoryAbi = [
             "internalType": "address"
           },
           {
-            "name": "registry",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "safetyFund",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "approvalBook",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "verifier",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "vaultModule",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "vaultImpl",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "tokenImpl",
+            "name": "usdc",
             "type": "address",
             "internalType": "address"
           },
@@ -59,29 +29,19 @@ export const vaultFactoryAbi = [
             "internalType": "address"
           },
           {
-            "name": "weth",
+            "name": "vaultImpl",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "usdc",
+            "name": "vaultModule",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "ensRegistry",
+            "name": "tokenImpl",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "ensResolver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "parentDnsName",
-            "type": "bytes",
-            "internalType": "bytes"
           },
           {
             "name": "defaultDelegates",
@@ -89,62 +49,9 @@ export const vaultFactoryAbi = [
             "internalType": "address[]"
           }
         ]
-      },
-      {
-        "name": "listed",
-        "type": "tuple[]",
-        "internalType": "struct VaultFactory.ListedAsset[]",
-        "components": [
-          {
-            "name": "underlying",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "feed",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "heartbeat",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "symbol",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "COIN_TYPE_ETH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ONBOARDING_FEE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -161,23 +68,10 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "function",
-    "name": "approvalBook",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "createVault",
     "inputs": [
       {
-        "name": "label",
+        "name": "name",
         "type": "string",
         "internalType": "string"
       },
@@ -187,24 +81,9 @@ export const vaultFactoryAbi = [
         "internalType": "struct PalmTypes.VaultConfig",
         "components": [
           {
-            "name": "owner",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "hotWallets",
+            "name": "wallets",
             "type": "address[]",
             "internalType": "address[]"
-          },
-          {
-            "name": "defaultReceiver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "guardian",
-            "type": "address",
-            "internalType": "address"
           },
           {
             "name": "recoveryKey",
@@ -215,21 +94,6 @@ export const vaultFactoryAbi = [
             "name": "recoveryVault",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "approver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "passkeyX",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "passkeyY",
-            "type": "bytes32",
-            "internalType": "bytes32"
           },
           {
             "name": "budget24h",
@@ -252,7 +116,12 @@ export const vaultFactoryAbi = [
             "internalType": "uint32"
           },
           {
-            "name": "fullDelay",
+            "name": "maxDelay",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "capDelay",
             "type": "uint32",
             "internalType": "uint32"
           },
@@ -281,12 +150,12 @@ export const vaultFactoryAbi = [
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "v",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "stateMutability": "payable"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -297,51 +166,6 @@ export const vaultFactoryAbi = [
         "name": "",
         "type": "address[]",
         "internalType": "address[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "dnsName",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ensRegistry",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IEnsRegistrar"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ensResolver",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IEnsResolver"
       }
     ],
     "stateMutability": "view"
@@ -393,477 +217,7 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "function",
-    "name": "labelOf",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "listedAssets",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple[]",
-        "internalType": "struct VaultFactory.ListedAsset[]",
-        "components": [
-          {
-            "name": "underlying",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "feed",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "heartbeat",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "symbol",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "nameInfo",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct VaultFactory.Name",
-        "components": [
-          {
-            "name": "vault",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "controller",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "institution",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "verified",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "onERC1155BatchReceived",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "onERC1155Received",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "onboardInstitution",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "cfg",
-        "type": "tuple",
-        "internalType": "struct PalmTypes.VaultConfig",
-        "components": [
-          {
-            "name": "owner",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "hotWallets",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "defaultReceiver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "guardian",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "recoveryKey",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "recoveryVault",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "approver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "passkeyX",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "passkeyY",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "budget24h",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "budget7d",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "hardCap",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "floorDelay",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "fullDelay",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "destinations",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "bizStartHourUtc",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "bizEndHourUtc",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "usualMaxPayout",
-            "type": "uint128",
-            "internalType": "uint128"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "v",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
-    "name": "parentDnsName",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "poolManager",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registry",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "reissue",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "cfg",
-        "type": "tuple",
-        "internalType": "struct PalmTypes.VaultConfig",
-        "components": [
-          {
-            "name": "owner",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "hotWallets",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "defaultReceiver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "guardian",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "recoveryKey",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "recoveryVault",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "approver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "passkeyX",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "passkeyY",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "budget24h",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "budget7d",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "hardCap",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "floorDelay",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "fullDelay",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "destinations",
-            "type": "address[]",
-            "internalType": "address[]"
-          },
-          {
-            "name": "bizStartHourUtc",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "bizEndHourUtc",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "usualMaxPayout",
-            "type": "uint128",
-            "internalType": "uint128"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "v",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "revoke",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "safeHarborSwapper",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "safetyFund",
     "inputs": [],
     "outputs": [
       {
@@ -889,74 +243,6 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "function",
-    "name": "setProfile",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "key",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "value",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setSafeHarborSwapper",
-    "inputs": [
-      {
-        "name": "swapper",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setTokenJar",
-    "inputs": [
-      {
-        "name": "jar",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "supportsInterface",
-    "inputs": [
-      {
-        "name": "interfaceId",
-        "type": "bytes4",
-        "internalType": "bytes4"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "tokenImpl",
     "inputs": [],
     "outputs": [
@@ -964,38 +250,6 @@ export const vaultFactoryAbi = [
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "tokenJar",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "tokensRecord",
-    "inputs": [
-      {
-        "name": "v",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "s",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -1040,120 +294,6 @@ export const vaultFactoryAbi = [
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "vaultOf",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "verifier",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "weth",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "event",
-    "name": "NameRevoked",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ProfileSet",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "key",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "value",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "Reissued",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "oldVault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "newVault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "event",
     "name": "VaultCreated",
     "inputs": [
@@ -1164,22 +304,16 @@ export const vaultFactoryAbi = [
         "internalType": "address"
       },
       {
-        "name": "label",
+        "name": "name",
         "type": "string",
         "indexed": false,
         "internalType": "string"
       },
       {
-        "name": "owner",
+        "name": "token",
         "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "institution",
-        "type": "bool",
         "indexed": false,
-        "internalType": "bool"
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1192,11 +326,6 @@ export const vaultFactoryAbi = [
   {
     "type": "error",
     "name": "BadConfig",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "BadFee",
     "inputs": []
   },
   {
@@ -1222,53 +351,7 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "error",
-    "name": "KeyNotAllowed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NameTaken",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotAdmin",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotController",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotMigrated",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRecoveryKey",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "StringsInsufficientHexLength",
-    "inputs": [
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "UnknownName",
     "inputs": []
   }
 ] as const;

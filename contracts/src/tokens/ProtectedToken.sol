@@ -2,7 +2,7 @@
 pragma solidity 0.8.29;
 
 interface IHotWalletRegistry {
-    function isHotWallet(address account) external view returns (bool);
+    function isWallet(address account) external view returns (bool);
 }
 
 /// An Owner's personal wrapped token for one Underlying (ADR-0006).
@@ -22,6 +22,8 @@ contract ProtectedToken {
     address public vault;
     address public underlying;
     address public poolManager;
+    /// The Orbital pool hook (ADR-0010): a transit holder between the PoolManager and wallets, like the PoolManager.
+    address public hook;
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
     event Approval(address indexed owner, address indexed spender, uint256 amount);
@@ -36,6 +38,7 @@ contract ProtectedToken {
         address vault_,
         address underlying_,
         address poolManager_,
+        address hook_,
         string calldata name_,
         string calldata symbol_,
         uint8 decimals_
@@ -44,6 +47,7 @@ contract ProtectedToken {
         vault = vault_;
         underlying = underlying_;
         poolManager = poolManager_;
+        hook = hook_;
         name = name_;
         symbol = symbol_;
         decimals = decimals_;
@@ -53,7 +57,7 @@ contract ProtectedToken {
 
     function mint(address to, uint256 amount) external {
         if (msg.sender != vault) revert OnlyVault();
-        if (to != poolManager && !_isHot(to)) revert TransferNotAllowed(address(0), to);
+        if (!_isPool(to) && !_isHot(to)) revert TransferNotAllowed(address(0), to);
         totalSupply += amount;
         unchecked {
             balanceOf[to] += amount;
@@ -99,8 +103,8 @@ contract ProtectedToken {
 
     /// The whitelist rule, readable by apps before they build a transfer.
     function canTransfer(address from, address to) public view returns (bool) {
-        if (from == poolManager) return to == vault || _isHot(to);
-        if (to == poolManager) return _isHot(from) || from == vault;
+        if (_isPool(from)) return to == vault || _isPool(to) || _isHot(to);
+        if (_isPool(to)) return _isHot(from) || from == vault;
         return _isHot(from) && _isHot(to);
     }
 
@@ -115,7 +119,11 @@ contract ProtectedToken {
         emit Transfer(from, to, amount);
     }
 
+    function _isPool(address a) internal view returns (bool) {
+        return a == poolManager || (a == hook && a != address(0));
+    }
+
     function _isHot(address a) internal view returns (bool) {
-        return IHotWalletRegistry(vault).isHotWallet(a);
+        return IHotWalletRegistry(vault).isWallet(a);
     }
 }

@@ -2,165 +2,178 @@
 
 import { useState } from "react";
 import { erc20Abi, maxUint256, type Address } from "viem";
-import { useAccount, useReadContract } from "wagmi";
-import { sepolia } from "wagmi/chains";
-import { vaultAbi } from "@/abi";
-import { toFullName, useNameProfile, type NameProfile } from "@/lib/ens";
-import { network } from "@/lib/network";
-import { BOND_WEI, formatUsd } from "@/lib/palm";
+import { useReadContract, useReadContracts } from "wagmi";
+import { orbitalHookAbi, orbitalRouterAbi, vaultAbi } from "@/abi";
+import { deployments } from "@/lib/deployments";
+import { arcTestnet } from "@/lib/network";
+import { KIND, REQ, STATUS, STATUS_LABEL, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
-import { NameCard } from "./name-card";
-import { Badge, Button, Card, Field, Input, Notice, Select } from "./ui";
-import { assetLabel, fmtAmount, safeParse, useRoles } from "./vault/common";
+import { hubAbi } from "@/abi";
+import { Badge, Button, Card, Field, Input, Mono, Notice, StatusBadge, short } from "./ui";
+import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./vault/common";
 
-export function NameLookup({ value, onChange }: { value: string; onChange: (s: string) => void }) {
-  return (
-    <Field label="Pay to name" hint={`e.g. nvidia or nvidia.${network.ensParent}`}>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="name" autoComplete="off" />
-    </Field>
-  );
+const chainId = arcTestnet.id;
+
+/** Payee Vault's token, receiving wallet, status and verified badge. */
+function usePayee(vault: Address | undefined) {
+  const q = useReadContracts({
+    allowFailure: true,
+    contracts: [
+      { address: vault, abi: vaultAbi, functionName: "token", chainId },
+      { address: vault, abi: vaultAbi, functionName: "wallets", chainId },
+      { address: deployments.hub, abi: hubAbi, functionName: "statusOf", args: [vault!], chainId },
+      { address: deployments.hub, abi: hubAbi, functionName: "verified", args: [vault!], chainId },
+    ],
+    query: { enabled: !!vault && !!deployments.hub, refetchInterval: 10_000 },
+  });
+  return {
+    token: q.data?.[0]?.result as Address | undefined,
+    receiver: (q.data?.[1]?.result as readonly Address[] | undefined)?.[0],
+    status: q.data?.[2]?.result as number | undefined,
+    verified: Boolean(q.data?.[3]?.result),
+  };
 }
 
-function payable(p: NameProfile) {
-  return !!p.vault && p.status !== "revoked" && p.status !== "migrated";
-}
-
-/** Member → Member Network transfer by name (burn payer's Protected token, mint payee's). */
-export function NetworkPayCard({ v }: { v: VaultView }) {
+/** Pay another org by name through the Orbital pool: exact-out, so the payee receives exactly the amount. */
+export function PoolPayCard({ v }: { v: VaultView }) {
   const roles = useRoles(v);
   const [to, setTo] = useState("");
-  const [assetAddr, setAssetAddr] = useState("");
   const [amount, setAmount] = useState("");
   const tx = useTx();
-  const p = useNameProfile(toFullName(to));
-  const asset = v.assets.find((a) => a.underlying === assetAddr) ?? v.assets[0];
-  const amt = asset ? safeParse(amount, asset.decimals) : undefined;
-  const usd = useReadContract({
-    address: v.vault,
-    abi: vaultAbi,
-    functionName: "valueUsd",
-    args: [asset?.underlying as Address, amt ?? 0n],
-    chainId: sepolia.id,
-    query: { enabled: !!asset && !!amt && !!v.vault },
+  const d = useDestination(to);
+  const p = usePayee(d.isVault ? d.address : undefined);
+  const amt = safeParse(amount);
+  const myToken = v.s?.token;
+  const quote = useReadContract({
+    address: deployments.hook,
+    abi: orbitalHookAbi,
+    functionName: "quote",
+    args: [myToken!, p.token!, amt ?? 0n, false],
+    chainId,
+    query: { enabled: !!myToken && !!p.token && !!amt && !!deployments.hook, refetchInterval: 10_000 },
   });
-  const usdValue = usd.data?.[0];
-  const instant = usdValue !== undefined && v.s ? usdValue <= v.s.availableBudgetUsd && !usd.data?.[1] : undefined;
-  const self = p.vault?.toLowerCase() === v.vault?.toLowerCase();
+  const allowance = useReadContract({
+    address: myToken,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [roles.address!, deployments.router!],
+    chainId,
+    query: { enabled: !!myToken && !!roles.address && !!deployments.router },
+  });
+  const amountIn = quote.data?.[0];
+  const maxIn = amountIn !== undefined ? amountIn + amountIn / 100n + 1n : undefined; // 1% slippage
+  const myBal = v.balances.find((b) => eq(b.wallet, roles.address))?.balance ?? 0n;
+  const needsApprove = maxIn !== undefined && (allowance.data ?? 0n) < maxIn;
+  const self = eq(d.address, v.vault);
+  // CRE live: the swap must consume a pool-swap clearance this wallet requested and the Sentinel cleared.
+  const clearances = v.requests.filter((r) => r.kind === KIND.SWAP && r.state === REQ.PENDING && eq(r.requester, roles.address));
+  const cleared = maxIn !== undefined ? clearances.find((r) => r.executable && r.amount >= maxIn) : undefined;
+  const waiting = clearances.find((r) => !r.executable);
+  const needsClearance = v.creLive && !cleared;
+  const overBudget = !v.creLive && amountIn !== undefined && v.s ? amountIn > v.s.availableBudget : false;
 
   async function go() {
-    if (!p.vault || !amt || !asset) return;
-    if (instant) {
-      await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "networkTransfer", args: [asset.underlying, amt, p.vault] }, "Network transfer");
-    } else {
-      await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "requestUnwrap", args: [asset.underlying, amt, p.vault, true], value: BOND_WEI }, "Queued Network transfer");
+    if (!myToken || !p.token || !p.receiver || !amt || !maxIn) return;
+    if (needsClearance) {
+      if (await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "requestSwap", args: [maxIn] }, "Request clearance (CRE scores it)")) v.refetch();
+      return;
     }
+    if (needsApprove) return tx.send({ address: myToken, abi: erc20Abi, functionName: "approve", args: [deployments.router!, maxUint256] }, `Approve ${v.symbol}`);
+    if (await tx.send({ address: deployments.router!, abi: orbitalRouterAbi, functionName: "swap", args: [myToken, p.token, amt, false, maxIn, p.receiver] }, "Pay via Orbital pool"))
+      setAmount("");
   }
 
   return (
-    <Card title="Network transfer by name">
-      <div className="flex flex-col gap-3">
-        <NameLookup value={to} onChange={setTo} />
-        <NameCard p={p} />
-        {p.type === "personal" && <Notice tone="gray">This is a personal name, not a verified Institution.</Notice>}
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <Field label="Amount">
-            <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="12" />
-          </Field>
-          <Field label="Asset">
-            <Select value={asset?.underlying ?? ""} onChange={(e) => setAssetAddr(e.target.value)}>
-              {v.assets.map((a) => (
-                <option key={a.underlying} value={a.underlying}>
-                  {assetLabel(a)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        {usdValue !== undefined && (
-          <div className="flex items-center gap-2 text-sm">
-            ≈ {formatUsd(usdValue)}
-            {instant ? <Badge tone="green">within Instant budget</Badge> : <Badge tone="amber">queues: 0.001 ETH bond</Badge>}
+    <Card title="Pay an org by name">
+      {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to pay.</Notice>}
+      <div className="mt-2 flex flex-col gap-3">
+        <Field
+          label="Payee"
+          hint={
+            d.name && d.resolving ? "Resolving…" : d.unknownName ? "No Vault under that name" : d.address && !d.isVault ? "Not a palmfi Vault: use Send for plain addresses" : undefined
+          }
+        >
+          <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="palantir" autoComplete="off" />
+        </Field>
+        {d.isVault && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] p-2 text-sm">
+            <strong>{d.name || short(d.address)}</strong>
+            <StatusBadge status={p.status !== undefined ? STATUS_LABEL[p.status] : undefined} />
+            {p.verified ? <Badge tone="blue">verified</Badge> : <Badge tone="amber">unverified</Badge>}
+            <span className="text-xs text-[var(--subtle)]">
+              paid to <Mono>{short(p.receiver)}</Mono>
+            </span>
           </div>
         )}
-        <Button onClick={go} disabled={!roles.isHot || !payable(p) || self || !amt || tx.busy}>
-          {instant === false ? "Create Queued request" : "Pay"}
+        <Field label="Amount they receive (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
+          <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
+        </Field>
+        {quote.error && <p className="text-xs text-red-600 dark:text-red-400">Pool can&apos;t quote this: both orgs need liquidity in the pool, neither may be Frozen, and the pool may be short (try less, or settle).</p>}
+        {amountIn !== undefined && (
+          <p className="text-sm">
+            You pay <span className="tabular font-medium">{fmtAmount(amountIn)} {v.symbol}</span> ({formatUsd(amountIn - (amt ?? 0n))} pool spread)
+            {overBudget && <span className="block text-xs text-amber-700 dark:text-amber-400">Over the Instant budget: queue a payment from Send instead.</span>}
+            {v.creLive && (
+              <span className="block text-xs text-[var(--subtle)]">
+                {cleared ? "Cleared by CRE: pay now." : waiting ? `Clearance #${waiting.id} is waiting on its delay or vote.` : "CRE checks every payment first: request clearance, then pay (routine amounts clear at once)."}
+              </span>
+            )}
+          </p>
+        )}
+        <Button onClick={go} disabled={!roles.isWallet || !d.isVault || self || !amt || amountIn === undefined || overBudget || myBal < (maxIn ?? 0n) || p.status === STATUS.FROZEN || (needsClearance && !!waiting) || tx.busy}>
+          {needsClearance ? (waiting ? "Waiting for clearance…" : "Request clearance") : needsApprove ? `Approve ${v.symbol}` : "Pay via Orbital pool"}
         </Button>
-        {!roles.isHot && <p className="text-xs text-[var(--subtle)]">Connect a treasury Hot wallet to pay.</p>}
         <TxStatus state={tx.state} />
       </div>
     </Card>
   );
 }
 
-const NATIVE = "native";
-
-/** Anyone pays into a name's Vault: deposit to the payee's receiving Hot wallet (mints their Protected token). */
-export function DirectPayCard() {
-  const { address } = useAccount();
-  const [to, setTo] = useState("");
-  const [asset, setAsset] = useState<string>(network.tokens.usdc);
+/** Add or withdraw this org's own token in the Orbital pool; settle moves foreign inventory back to its issuers. */
+export function LiquidityCard({ v }: { v: VaultView }) {
+  const roles = useRoles(v);
   const [amount, setAmount] = useState("");
   const tx = useTx();
-  const p = useNameProfile(toFullName(to));
-  const decimals = useReadContract({ address: asset === NATIVE ? undefined : (asset as Address), abi: erc20Abi, functionName: "decimals", chainId: sepolia.id, query: { enabled: asset !== NATIVE } });
-  const dec = asset === NATIVE ? 18 : (decimals.data ?? 6);
-  const amt = safeParse(amount, dec);
-  const receiver = useReadContract({ address: p.vault, abi: vaultAbi, functionName: "defaultReceiver", chainId: sepolia.id, query: { enabled: !!p.vault } });
+  const token = v.s?.token;
+  const amt = safeParse(amount);
   const allowance = useReadContract({
-    address: asset === NATIVE ? undefined : (asset as Address),
+    address: token,
     abi: erc20Abi,
     functionName: "allowance",
-    args: [address!, p.vault!],
-    chainId: sepolia.id,
-    query: { enabled: asset !== NATIVE && !!address && !!p.vault },
+    args: [roles.address!, deployments.hook!],
+    chainId,
+    query: { enabled: !!token && !!roles.address && !!deployments.hook },
   });
-  const bal = useReadContract({
-    address: asset === NATIVE ? undefined : (asset as Address),
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [address!],
-    chainId: sepolia.id,
-    query: { enabled: asset !== NATIVE && !!address },
-  });
-  const needsApprove = asset !== NATIVE && !!amt && (allowance.data ?? 0n) < amt;
-
-  async function go() {
-    if (!p.vault || !amt || !receiver.data) return;
-    if (asset === NATIVE) {
-      await tx.send({ address: p.vault, abi: vaultAbi, functionName: "depositETH", args: [receiver.data], value: amt }, "Pay ETH");
-    } else if (needsApprove) {
-      await tx.send({ address: asset as Address, abi: erc20Abi, functionName: "approve", args: [p.vault, maxUint256] }, "Approve");
-    } else {
-      await tx.send({ address: p.vault, abi: vaultAbi, functionName: "deposit", args: [asset as Address, amt, receiver.data] }, "Pay");
-    }
-  }
+  const needsApprove = !!amt && (allowance.data ?? 0n) < amt;
+  const hook = (functionName: string, args: unknown[], label: string) => tx.send({ address: deployments.hook!, abi: orbitalHookAbi, functionName, args }, label);
 
   return (
-    <Card title="Pay by name">
-      <div className="flex flex-col gap-3">
-        <NameLookup value={to} onChange={setTo} />
-        <NameCard p={p} />
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <Field label="Amount" hint={bal.data !== undefined ? `Wallet: ${fmtAmount(bal.data, dec)}` : undefined}>
-            <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5" />
-          </Field>
-          <Field label="Asset">
-            <Select value={asset} onChange={(e) => setAsset(e.target.value)}>
-              <option value={network.tokens.usdc}>USDC</option>
-              <option value={network.tokens.weth}>WETH</option>
-              <option value={NATIVE}>ETH</option>
-            </Select>
-          </Field>
+    <Card title="Orbital pool liquidity">
+      <p className="text-sm">
+        You provided <span className="tabular font-medium">{fmtAmount(v.poolLiquidity)} {v.symbol}</span>; the pool holds <span className="tabular">{fmtAmount(v.poolReserve)}</span>.
+      </p>
+      <p className="mt-1 text-xs text-[var(--subtle)]">Each org only adds and withdraws its own token. Withdrawals settle first: foreign tokens go back to their issuers for USDC.</p>
+      {roles.isWallet && (
+        <div className="mt-3 flex flex-col gap-2">
+          <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={!amt || tx.busy}
+              onClick={() => (needsApprove ? tx.send({ address: token!, abi: erc20Abi, functionName: "approve", args: [deployments.hook!, maxUint256] }, `Approve ${v.symbol}`) : hook("addLiquidity", [token, amt], "Add liquidity"))}
+            >
+              {needsApprove ? `Approve ${v.symbol}` : "Add"}
+            </Button>
+            <Button variant="secondary" disabled={!amt || amt > v.poolLiquidity || tx.busy} onClick={() => hook("removeLiquidity", [token, amt, roles.address], "Withdraw liquidity")}>
+              Withdraw
+            </Button>
+            <Button variant="ghost" disabled={tx.busy} onClick={() => hook("settle", [], "Settle pool")}>
+              Settle pool
+            </Button>
+          </div>
         </div>
-        <p className="text-xs text-[var(--subtle)]">
-          The payment lands in their Vault as their Protected token, so it&apos;s protected from the first block. It arrives even if their Vault is Frozen.
-        </p>
-        <Button onClick={go} disabled={!payable(p) || !amt || !receiver.data || tx.busy}>
-          {needsApprove ? "Approve" : `Pay ${p.name ?? ""}`}
-        </Button>
-        <TxStatus state={tx.state} />
-      </div>
+      )}
+      <TxStatus state={tx.state} />
     </Card>
   );
 }
