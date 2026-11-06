@@ -258,7 +258,8 @@ contract LifelineTest is NetworkTest {
         vm.prank(attacker);
         vm.expectRevert(VaultBase.NotWallet.selector);
         mod(nvidia).approveLifeline(id);
-        vm.prank(attacker);
+        // (a contract that isn't a registered Vault: an EOA caller can't even be decoded as one)
+        vm.prank(address(hub()));
         vm.expectRevert();
         hook.lifelineDraw(address(palantir), 100e6, 0);
 
