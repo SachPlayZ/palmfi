@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Vault} from "../src/Vault.sol";
+import {VaultBase} from "../src/VaultBase.sol";
 
 /// Ticket #4: ETH/WETH deposits, native ETH unwraps, one shared USD budget.
 contract EthDepositsTest is NetworkTest {
@@ -70,7 +71,7 @@ contract EthDepositsTest is NetworkTest {
         uint256 tooMuch = _ethFor(2.5e6);
         uint256 fits = _ethFor(1.8e6);
         vm.prank(hotWallet);
-        vm.expectPartialRevert(Vault.OverBudget.selector);
+        vm.expectPartialRevert(VaultBase.OverBudget.selector);
         v.unwrap(ext.weth, tooMuch, payee, false);
 
         vm.prank(hotWallet);

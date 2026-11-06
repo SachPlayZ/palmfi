@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Vault} from "../src/Vault.sol";
+import {VaultBase} from "../src/VaultBase.sol";
 import {ProtectedToken} from "../src/tokens/ProtectedToken.sol";
 import {PalmTypes} from "../src/libraries/PalmTypes.sol";
 
@@ -61,17 +62,17 @@ contract WhitelistTest is NetworkTest {
     function test_hotWalletAddedOnlyByRecoveryKeyAfterTimelock() public {
         address newHot = makeAddr("newHot");
         vm.prank(hotWallet);
-        vm.expectRevert(Vault.NotRecoveryKey.selector);
-        v.proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
+        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
+        mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
 
         vm.prank(recoveryKey);
-        uint256 id = v.proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
+        uint256 id = mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(newHot));
         vm.prank(recoveryKey);
-        vm.expectRevert(Vault.TimelockActive.selector);
-        v.executeChange(id);
+        vm.expectRevert(VaultBase.TimelockActive.selector);
+        mod(v).executeChange(id);
         skip(48 hours);
         vm.prank(recoveryKey);
-        v.executeChange(id);
+        mod(v).executeChange(id);
         assertTrue(v.isHotWallet(newHot));
         vm.prank(hotWallet);
         t.transfer(newHot, 1e6);
@@ -79,7 +80,7 @@ contract WhitelistTest is NetworkTest {
 
     function test_removingHotWalletIsInstant() public {
         vm.prank(hotWallet);
-        v.removeHotWallet(hotWallet2);
+        mod(v).removeHotWallet(hotWallet2);
         assertFalse(v.isHotWallet(hotWallet2));
         vm.prank(hotWallet);
         vm.expectPartialRevert(ProtectedToken.TransferNotAllowed.selector);

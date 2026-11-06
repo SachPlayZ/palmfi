@@ -4,6 +4,7 @@ pragma solidity 0.8.29;
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Passkey} from "./base/Passkey.sol";
 import {Vault} from "../src/Vault.sol";
+import {VaultBase} from "../src/VaultBase.sol";
 import {PalmTypes as T} from "../src/libraries/PalmTypes.sol";
 
 /// Ticket #7: HOLD + passkey Second factor, and every row of the spec §6.3 resolution table.
@@ -45,10 +46,10 @@ contract SecondFactorTest is NetworkTest {
         uint256 id = _request(80e6);
         uint256 other = _request(60e6);
         bytes memory wrongKey = Passkey.assertion(0xBAD, v.getRequest(id).requestHash);
-        vm.expectRevert(Vault.BadSignature.selector);
+        vm.expectRevert(VaultBase.BadSignature.selector);
         v.confirm(id, wrongKey);
         bytes memory forOther = Passkey.assertion(PK, v.getRequest(other).requestHash);
-        vm.expectRevert(Vault.BadSignature.selector);
+        vm.expectRevert(VaultBase.BadSignature.selector);
         v.confirm(id, forOther);
     }
 
@@ -116,7 +117,7 @@ contract SecondFactorTest is NetworkTest {
         vm.prank(guardian);
         v.cancel(id);
         skip(72 hours);
-        vm.expectRevert(Vault.NotExecutable.selector);
+        vm.expectRevert(VaultBase.NotExecutable.selector);
         v.execute(id);
     }
 
