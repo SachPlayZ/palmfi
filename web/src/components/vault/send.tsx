@@ -1,5 +1,6 @@
 "use client";
 
+import { AmountChips } from "@/components/amount-chips";
 import { useState } from "react";
 import { vaultAbi } from "@/abi";
 import { BOND, formatUsd } from "@/lib/palm";
@@ -41,6 +42,7 @@ export function SendCard({ v }: { v: VaultView }) {
         <Field label="Amount (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
+        <AmountChips value={amount} onChange={setAmount} max={roles.isWallet ? myBal : undefined} />
         <Field
           label="Destination"
           hint={

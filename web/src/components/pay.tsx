@@ -1,5 +1,6 @@
 "use client";
 
+import { AmountChips } from "@/components/amount-chips";
 import Link from "next/link";
 import { useState } from "react";
 import { erc20Abi, maxUint256, type Address } from "viem";
@@ -115,6 +116,7 @@ export function PoolPayCard({ v, initialTo = "", initialAmount = "" }: { v: Vaul
         <Field label="Amount they receive (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
+        <AmountChips value={amount} onChange={setAmount} />
         {quote.error && <p className="text-[13px] text-[var(--red)]">Pool can&apos;t quote this: both orgs need liquidity in the pool, neither may be Frozen, and the pool may be short (try less, or settle).</p>}
         {amountIn !== undefined && (
           <p className="rounded-2xl bg-[var(--paper-2)] p-3 text-sm">

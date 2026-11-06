@@ -1,5 +1,6 @@
 "use client";
 
+import { AmountChips } from "@/components/amount-chips";
 import { erc20Abi, maxUint256 } from "viem";
 import { useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
@@ -130,6 +131,7 @@ export function DepositCard({ v }: { v: VaultView }) {
         <Field label="Amount" hint={bal.data !== undefined ? `This wallet: ${fmtAmount(bal.data)} USDC` : undefined}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
+        <AmountChips value={amount} onChange={setAmount} max={bal.data} />
         <Field label={`Mint ${v.symbol} to`} hint="Protected tokens can only be held by this Vault's wallets">
           <Select value={recipient ?? ""} onChange={(e) => setTo(e.target.value)}>
             {s?.wallets.map((w) => (
