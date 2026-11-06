@@ -1,0 +1,3 @@
+# Deploy on Arc testnet, USDC only, no ENS
+
+We move from Ethereum Sepolia to Arc testnet (5042002), where USDC is the gas token and Uniswap v4 and the CRE forwarders are deployed. USDC is both native (18 dec) and an ERC-20 (6 dec) over one balance, so Vaults account only through the ERC-20 at 0x3600…0000 and reject `msg.value`. ETH/WETH, Safe-harbor swaps, Market modes, TJAR and SafetyFund are cut. ENS is replaced by a Hub name directory with a factory-owner `verified` badge, which has no fund powers. The cost: a full redeploy a day before the deadline, and the v1 Sepolia deployment is abandoned.

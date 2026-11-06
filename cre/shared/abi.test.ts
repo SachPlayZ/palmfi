@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { toEventSignature, type AbiEvent, type AbiFunction } from "viem";
-import { approvalBookAbi, hubAbi, hubEventsAbi, vaultAbi } from "./abi";
+import { hubAbi, hubEventsAbi, vaultAbi } from "./abi";
 
 const src = async (p: string) => Bun.file(`${import.meta.dir}/../../contracts/src/${p}`).text();
 const HUB = await src("Hub.sol");
 // The Vault address serves Vault.sol, its VaultBase storage and (via delegatecall) VaultModule.sol.
 const VAULT = (await Promise.all(["Vault.sol", "VaultBase.sol", "VaultModule.sol"].map(src))).join("\n");
-const BOOK = await src("ApprovalBook.sol");
 
 /** Canonical parameter types of a Solidity parameter list: drop names, `indexed`, data locations. */
 const types = (params: string) =>
@@ -29,7 +28,7 @@ const solFunctionInputs = (source: string, name: string) => {
 const solStruct = (source: string, name: string) => {
   const m = source.match(new RegExp(`struct\\s+${name}\\s*\\{([^}]*)\\}`, "s"));
   return m
-    ? [...m[1].replace(/\/\/[^\n]*/g, "").matchAll(/(\w+)\s+(\w+)\s*;/g)].map((x) => `${x[1]} ${x[2]}`)
+    ? [...m[1].replace(/\/\/[^\n]*/g, "").matchAll(/([\w.\[\]]+)\s+(\w+)\s*;/g)].map((x) => `${x[1]} ${x[2]}`)
     : undefined;
 };
 
@@ -45,7 +44,6 @@ describe("view function inputs match the Solidity sources", () => {
   const cases: [string, readonly AbiFunction[], string][] = [
     ["Hub.sol", hubAbi.filter((x) => x.type === "function") as AbiFunction[], HUB],
     ["Vault.sol", vaultAbi.filter((x) => x.type === "function") as AbiFunction[], VAULT],
-    ["ApprovalBook.sol", approvalBookAbi.filter((x) => x.type === "function") as AbiFunction[], BOOK],
   ];
   for (const [file, fns, source] of cases) {
     for (const f of fns) {
@@ -68,5 +66,9 @@ describe("structs match", () => {
   };
   test("Vault.Request", () => expect(fields(vaultAbi, "getRequest")).toEqual(solStruct(VAULT, "Request")!));
   test("Hub.OpenRequest", () => expect(fields(hubAbi, "openRequests")).toEqual(solStruct(HUB, "OpenRequest")!));
-  test("ApprovalBook.Approval", () => expect(fields(approvalBookAbi, "get")).toEqual(solStruct(BOOK, "Approval")!));
+  // nested structs come back from viem as `tuple` / `tuple[]`
+  test("VaultModule.ScoringContext", () =>
+    expect(fields(vaultAbi, "scoringContext")).toEqual(
+      solStruct(VAULT, "ScoringContext")!.map((f) => f.replace(/^(T\.)?[A-Z]\w*/, "tuple")),
+    ));
 });

@@ -1,0 +1,19 @@
+{
+  "chainId": 5042002,
+  "rpc": "https://rpc.testnet.arc.network",
+  "explorer": "https://testnet.arcscan.app",
+  "uniswap": {
+    "poolManager": "0x1d70945634f618eefdf9edaadb59b9a183cef929",
+    "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3"
+  },
+  "tokens": {
+    "usdc": "0x3600000000000000000000000000000000000000"
+  },
+  "cre": {
+    "simForwarder": "0x6E9EE680ef59ef64Aa8C7371279c27E496b5eDc1",
+    "forwarder": "0x76c9cf548b4179F8901cda1f8623568b58215E62"
+  },
+  "delegates": {
+    "metamaskEip7702StatelessDeleGator": "0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B"
+  }
+}

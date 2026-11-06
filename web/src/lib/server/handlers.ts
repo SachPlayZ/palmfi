@@ -3,7 +3,7 @@
  * unit-tested with a mocked fetch and KV.
  */
 import { getAddress, isAddress, recoverMessageAddress, type Address, type Hex } from "viem";
-import { decodeReasonCodes, REQ_LABEL } from "../palm";
+import { decodeReasonCodes, formatBits, formatDuration } from "../palm";
 import { chatKey, type KV } from "./kv";
 import { linkMessage, makeLinkToken, safeEqual, sendTelegram, verifyLinkToken } from "./telegram";
 
@@ -13,7 +13,7 @@ export type Deps = {
   env: Env;
   kv: KV | null;
   fetch: typeof fetch;
-  /** Whether `signer` controls `vault` (its owner, Recovery key or a Hot wallet). */
+  /** Whether `signer` is one of `vault`'s wallets (Voters) or its Recovery key. */
   isController?: (vault: Address, signer: Address) => Promise<boolean>;
   now?: () => number;
 };
@@ -21,10 +21,20 @@ export type Deps = {
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-export const NOTIFY_KINDS = ["HOLD", "FLAG", "FREEZE", "CONFIG_CHANGE", "CLEAR", "EXECUTED", "UNFROZEN", "MIGRATED", "TEST"] as const;
+export const NOTIFY_KINDS = ["DELAY", "FLAG", "FREEZE", "CONFIG_CHANGE", "UNFROZEN", "MIGRATED", "TEST"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
-export type NotifyBody = { vault: Address; kind: NotifyKind; requestId?: string; reasonCodes?: string; label?: string };
+export type NotifyBody = {
+  vault: Address;
+  kind: NotifyKind;
+  requestId?: string;
+  reasonCodes?: string;
+  /** Milli-bits. */
+  score?: string;
+  /** Seconds. */
+  delay?: string;
+  label?: string;
+};
 
 function parseUint(v: unknown): string | undefined | null {
   if (v === undefined || v === null || v === "") return undefined;
@@ -44,11 +54,16 @@ export function parseNotifyBody(raw: unknown): NotifyBody | string {
   if (requestId === null) return "requestId must be a non-negative integer";
   const reasonCodes = parseUint(b.reasonCodes);
   if (reasonCodes === null) return "reasonCodes must be a non-negative integer bitmap";
+  const score = parseUint(b.score);
+  const delay = parseUint(b.delay);
+  if (score === null || delay === null) return "score and delay must be non-negative integers";
   return {
     vault: getAddress(b.vault),
     kind: b.kind.toUpperCase() as NotifyKind,
     requestId,
     reasonCodes,
+    score,
+    delay,
     label: typeof b.label === "string" ? b.label.slice(0, 64) : undefined,
   };
 }
@@ -56,24 +71,24 @@ export function parseNotifyBody(raw: unknown): NotifyBody | string {
 export function formatNotifyMessage(b: NotifyBody, appUrl?: string): string {
   const who = b.label ? `${b.label}` : b.vault;
   const head: Record<NotifyKind, string> = {
-    HOLD: "Queued request HELD: it needs your Second factor",
+    DELAY: "Unusual Queued request: vote now if you don't recognise it",
     FLAG: "Queued request FLAGGED: your Vault is Frozen",
     FREEZE: "Your Vault is Frozen",
     CONFIG_CHANGE: "A settings change is pending on your Vault",
-    CLEAR: "Queued request CLEARED",
-    EXECUTED: `Queued request ${REQ_LABEL[5]}`,
     UNFROZEN: "Your Vault was unfrozen",
     MIGRATED: "Your Vault was migrated to its Recovery vault",
     TEST: "Telegram notifications are linked",
   };
   const lines = [`palmfi | ${who}`, head[b.kind]];
   if (b.requestId !== undefined) lines.push(`Request #${b.requestId}`);
+  if (b.score !== undefined && b.score !== "0") lines.push(`Surprise score ${formatBits(Number(b.score))}`);
+  if (b.kind === "DELAY" && b.delay !== undefined) lines.push(`Executable in ${formatDuration(Number(b.delay))} unless a majority vetoes`);
   if (b.reasonCodes !== undefined && b.reasonCodes !== "0") {
     const codes = decodeReasonCodes(BigInt(b.reasonCodes));
     if (codes.length) lines.push(`Reasons: ${codes.map((c) => c.code).join(", ")}`);
   }
   if (b.kind === "FLAG" || b.kind === "FREEZE") lines.push("If this wasn't you, open the incident view now.");
-  if (b.kind === "CONFIG_CHANGE") lines.push("If you didn't propose it, cancel it with your Recovery key or Guardian.");
+  if (b.kind === "CONFIG_CHANGE") lines.push("If no wallet of yours proposed it, cancel it from the dashboard.");
   if (appUrl) {
     const base = appUrl.replace(/\/$/, "");
     lines.push(b.kind === "FLAG" || b.kind === "FREEZE" ? `${base}/vault/${b.vault}/incident` : `${base}/vault/${b.vault}`);
@@ -101,21 +116,27 @@ export async function handleNotify(req: Request, deps: Deps): Promise<Response> 
   if (!botToken) return json(503, { ok: false, error: "TELEGRAM_BOT_TOKEN not configured" });
   if (!deps.kv) return json(503, { ok: false, error: "KV not configured" });
 
-  const chatId = await deps.kv.get(chatKey(body.vault));
+  const chats = parseChats(await deps.kv.get(chatKey(body.vault)));
   // 200 so the Sentinel doesn't retry: an unlinked Vault is a normal case.
-  if (!chatId) return json(200, { ok: true, delivered: false, reason: "no Telegram chat linked for this Vault" });
+  if (!chats.length) return json(200, { ok: true, delivered: false, reason: "no Telegram chat linked for this Vault" });
 
-  const sent = await sendTelegram(botToken, chatId, formatNotifyMessage(body, deps.env.APP_URL), deps.fetch);
-  if (!sent.ok) return json(502, { ok: false, delivered: false, error: sent.description ?? `telegram ${sent.status}` });
-  return json(200, { ok: true, delivered: true });
+  // Fan out to every Voter's chat, so a hacked requester can't mute the others.
+  const text = formatNotifyMessage(body, deps.env.APP_URL);
+  const sent = await Promise.all(chats.map((c) => sendTelegram(botToken, c, text, deps.fetch)));
+  const ok = sent.filter((r) => r.ok).length;
+  if (!ok) return json(502, { ok: false, delivered: false, error: sent[0].description ?? `telegram ${sent[0].status}` });
+  return json(200, { ok: true, delivered: true, chats: ok });
 }
+
+/** KV holds every linked chat of a Vault as a comma-separated list. */
+export const parseChats = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
 
 function linkSecret(env: Env): string | undefined {
   return env.TELEGRAM_LINK_SECRET ?? env.TELEGRAM_BOT_TOKEN;
 }
 
 /**
- * POST /api/telegram/link-token {vault, issuedAt, signature}: the Vault's owner (or Recovery key / Hot wallet)
+ * POST /api/telegram/link-token {vault, issuedAt, signature}: one of the Vault's wallets (or its Recovery key)
  * signs linkMessage(vault, issuedAt); we return the bot deep link that carries an HMAC'd token for that Vault.
  */
 export async function handleLinkToken(req: Request, deps: Deps): Promise<Response> {
@@ -184,11 +205,12 @@ export async function handleTelegramWebhook(req: Request, deps: Deps): Promise<R
     await sendTelegram(botToken, String(chatId), "That link is invalid. Generate a new one from your Vault in palmfi.", deps.fetch);
     return json(200, { ok: true, linked: false });
   }
-  await deps.kv.set(chatKey(vault), String(chatId));
+  const chats = parseChats(await deps.kv.get(chatKey(vault)));
+  if (!chats.includes(String(chatId))) await deps.kv.set(chatKey(vault), [...chats, String(chatId)].join(","));
   await sendTelegram(
     botToken,
     String(chatId),
-    `Linked. This chat will get palmfi alerts (HOLD, FLAG, Freeze, pending settings changes) for Vault ${vault}.`,
+    `Linked. This chat will get palmfi alerts (unusual requests, FLAG, Freeze, settings changes) for Vault ${vault}.`,
     deps.fetch,
   );
   return json(200, { ok: true, linked: true, vault });

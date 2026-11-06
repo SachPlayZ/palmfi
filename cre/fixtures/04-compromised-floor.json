@@ -1,0 +1,11 @@
+{
+  "row": "Compromised CRE sets Floor",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "Onchain half only (Foundry QueuedLane.t.sol): Vault clamps every delay to [Floor, MaxDelay] and CapDelay over the Hard cap.",
+  "expect": "",
+  "unitTest": "sentinel/failure-matrix.test.ts row 4",
+  "enabled": false,
+  "cliPossible": false
+}

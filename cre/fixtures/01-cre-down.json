@@ -1,0 +1,10 @@
+{
+  "row": "CRE fully down",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "Point ARC_RPC_URL at a dead endpoint: no SET_DELAY and no freeze are written on missing data; queued requests keep MaxDelay.",
+  "expect": "\"requests\":[]",
+  "unitTest": "sentinel/failure-matrix.test.ts row 1",
+  "enabled": false
+}

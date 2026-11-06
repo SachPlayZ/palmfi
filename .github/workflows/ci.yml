@@ -17,9 +17,24 @@ jobs:
           submodules: true
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge build --sizes
-      - run: forge test -vv
+      # Fork tests read a pinned Arc block. The RPC state cache is saved even when tests fail, and retries with
+      # backoff keep the public RPC's rate limit (429) out of CI.
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.foundry/cache/rpc
+          key: foundry-rpc-arc-71037000-${{ github.run_id }}
+          restore-keys: foundry-rpc-arc-71037000-
+      - run: >-
+          forge test -vv --jobs 2 --fork-url "$ARC_RPC_URL" --fork-block-number "$FORK_BLOCK"
+          --fork-retries 10 --fork-retry-backoff 3000 --compute-units-per-second 300
         env:
-          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}
+          ARC_RPC_URL: ${{ secrets.ARC_RPC_URL || 'https://rpc.testnet.arc.network' }}
+          FORK_BLOCK: 71037000
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.foundry/cache/rpc
+          key: foundry-rpc-arc-71037000-${{ github.run_id }}
 
   cre:
     runs-on: ubuntu-latest
@@ -31,7 +46,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      # One bun workspace (cre/package.json): hello, shared (palm constants + decision engine),
+      # One bun workspace (cre/package.json): shared (palm constants + deviation model),
       # sentinel and reconciler. Typecheck and test every package.
       - run: bun install --frozen-lockfile
       - run: bun run typecheck

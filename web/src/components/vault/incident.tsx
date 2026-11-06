@@ -1,31 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { parseAbiItem, type Address } from "viem";
-import { useReadContracts } from "wagmi";
-import { sepolia } from "wagmi/chains";
-import { networkRegistryAbi, vaultAbi } from "@/abi";
+import { encodeAbiParameters, parseAbiItem } from "viem";
+import { vaultAbi } from "@/abi";
 import { deployments } from "@/lib/deployments";
 import { useEventLogs } from "@/lib/logs";
-import { STATUS, decodeReasonCodes, formatDuration } from "@/lib/palm";
-import { isOpen } from "@/lib/requests";
+import { txUrl } from "@/lib/network";
+import { CHANGE, REQ, decodeReasonCodes, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
-import { signWithPasskey } from "@/lib/webauthn";
 import { Badge, Button, Card, Mono, Notice, short } from "../ui";
+import { useRoles } from "./common";
 import { VaultGate } from "./dashboard";
 import { VaultHeader } from "./header";
-import { useNow, useRoles } from "./common";
+import { PendingChanges } from "./settings";
 
-const frozenEv = parseAbiItem("event Frozen(address indexed vault, uint256 reasonCodes)");
+const frozenEv = parseAbiItem("event Frozen(address indexed vault, address by, uint256 reasonCodes)");
 const flaggedEv = parseAbiItem("event Flagged(address indexed vault, uint256 indexed requestId, uint256 reasonCodes, address destination)");
 const unfrozenEv = parseAbiItem("event Unfrozen(address indexed vault)");
-const blocklistedEv = parseAbiItem("event Blocklisted(address indexed account, address indexed sourceVault, uint64 until)");
 
 function ReasonList({ bitmap }: { bitmap: bigint }) {
   const codes = decodeReasonCodes(bitmap);
-  if (!codes.length) return <span className="text-xs text-[var(--subtle)]">no reason codes</span>;
+  if (!codes.length) return <span className="text-xs text-[var(--subtle)]">no reason codes (manual freeze)</span>;
   return (
     <ul className="flex flex-col gap-1">
       {codes.map((c) => (
@@ -39,173 +35,100 @@ function ReasonList({ bitmap }: { bitmap: bigint }) {
 }
 
 function IncidentBody({ v }: { v: VaultView }) {
-  const s = v.s!;
   const roles = useRoles(v);
-  const now = useNow(5000);
   const tx = useTx();
-  const [err, setErr] = useState<string>();
   const frozen = useEventLogs("frozen", { address: deployments.hub, event: frozenEv, args: { vault: v.vault } });
   const flagged = useEventLogs("flagged", { address: deployments.hub, event: flaggedEv, args: { vault: v.vault } });
   const unfrozen = useEventLogs("unfrozen", { address: deployments.hub, event: unfrozenEv, args: { vault: v.vault } });
-  const blocked = useEventLogs("blocklisted", { address: deployments.registry, event: blocklistedEv, args: { sourceVault: v.vault } });
-  const networkBlocked = useEventLogs("blocklisted-all", { address: deployments.registry, event: blocklistedEv });
-  const blockedAccounts = (blocked.data ?? []).map((l) => l.args.account as Address);
-  const stillBlocked = useReadContracts({
-    allowFailure: true,
-    contracts: blockedAccounts.map((a) => ({ address: deployments.registry, abi: networkRegistryAbi, functionName: "isBlocked", args: [a], chainId: sepolia.id }) as const),
-    query: { enabled: blockedAccounts.length > 0 },
-  });
-
-  const latestFreeze = frozen.data?.[0];
-  const isFrozen = v.status === STATUS.FROZEN;
-  const openReqs = v.requests.filter((r) => isOpen(r.state));
-
-  async function unfreeze() {
-    setErr(undefined);
-    try {
-      let sig: `0x${string}` = "0x";
-      if (!s.institution) sig = await signWithPasskey(s.unfreezeChallenge, { x: s.passkeyX, y: s.passkeyY });
-      await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "unfreeze", args: [sig] }, "Unfreeze");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  }
+  const isFrozen = v.status === 2;
+  const flaggedReqs = v.requests.filter((r) => r.state === REQ.FLAGGED);
+  const propose = (kind: number, label: string) =>
+    tx.send({ address: v.vault!, abi: vaultAbi, functionName: "proposeChange", args: [kind, kind === CHANGE.MIGRATE || kind === CHANGE.UNFREEZE ? "0x" : encodeAbiParameters([{ type: "address" }], [v.s!.recoveryVault])] }, label);
 
   return (
     <>
       <VaultHeader v={v} />
-      <Card title={isFrozen ? "Freeze" : "Incident history"} tone={isFrozen ? "danger" : undefined}>
-        {isFrozen ? (
-          <p className="mb-3 text-sm">
-            Every outflow is stopped: instant unwraps, Uniswap unwraps, Queued request execution, outgoing Network transfers and Safe-harbor swaps.
-            Deposits and incoming Network transfers still arrive.
-          </p>
-        ) : (
-          <p className="mb-3 text-sm text-[var(--subtle)]">This Vault is not Frozen right now.</p>
-        )}
+      <Link href={`/vault/${v.vault}`} className="text-sm underline">
+        ← Back to dashboard
+      </Link>
+      {!isFrozen && <Notice tone="green">Not frozen. Outflows are open.</Notice>}
+
+      <Card title="What happened" tone={isFrozen ? "danger" : undefined}>
         {frozen.isLoading && <p className="text-sm text-[var(--subtle)]">Reading Hub events…</p>}
-        {latestFreeze && (
-          <div className="mb-3 flex flex-col gap-2">
-            <p className="text-sm font-medium">
-              Last Freeze at block {latestFreeze.blockNumber?.toString()}{" "}
-              <a className="text-xs underline" href={`https://sepolia.etherscan.io/tx/${latestFreeze.transactionHash}`} target="_blank" rel="noreferrer">
-                tx
-              </a>
-            </p>
-            <ReasonList bitmap={latestFreeze.args.reasonCodes ?? 0n} />
-          </div>
-        )}
-        {(flagged.data?.length ?? 0) > 0 && (
-          <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">FLAGs</h3>
-            {flagged.data!.map((l) => (
-              <div key={`${l.transactionHash}-${l.logIndex}`} className="rounded-lg border border-red-500/40 p-2">
-                <p className="text-sm">
-                  {l.args.requestId ? `Queued request #${l.args.requestId.toString()}` : "Reconciler FLAG (delegation / reserves)"}
-                  {l.args.destination && l.args.destination !== "0x0000000000000000000000000000000000000000" && (
-                    <>
-                      {" "}
-                      to <Mono>{l.args.destination}</Mono>
-                    </>
-                  )}
-                </p>
-                <ReasonList bitmap={l.args.reasonCodes ?? 0n} />
+        {frozen.data?.length === 0 && <p className="text-sm text-[var(--subtle)]">This Vault has never been frozen.</p>}
+        <ul className="flex flex-col gap-3">
+          {frozen.data?.map((l) => (
+            <li key={`${l.transactionHash}-${l.logIndex}`} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span>
+                  Frozen by <Mono>{short(l.args.by)}</Mono> {l.args.by?.toLowerCase() === deployments.hub?.toLowerCase() ? "(Sentinel FLAG)" : ""}
+                </span>
+                <a className="text-xs underline" href={txUrl(l.transactionHash!)} target="_blank" rel="noreferrer">
+                  tx
+                </a>
               </div>
-            ))}
+              <ReasonList bitmap={l.args.reasonCodes ?? 0n} />
+            </li>
+          ))}
+        </ul>
+        {!!flagged.data?.length && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-medium">Flagged requests</h3>
+            <ul className="flex flex-col gap-2">
+              {flagged.data.map((l) => {
+                const r = flaggedReqs.find((x) => x.id === l.args.requestId);
+                return (
+                  <li key={`${l.transactionHash}-${l.logIndex}`} className="rounded-lg border border-red-500/40 p-2 text-sm">
+                    #{l.args.requestId?.toString()} {r && formatUsd(r.amount)} → <Mono>{short(l.args.destination)}</Mono> (destination blocklisted network-wide)
+                    <ReasonList bitmap={l.args.reasonCodes ?? 0n} />
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
-        {(unfrozen.data?.length ?? 0) > 0 && <p className="mt-2 text-xs text-[var(--subtle)]">Unfrozen {unfrozen.data!.length} time(s) before.</p>}
+        {!!unfrozen.data?.length && <p className="mt-3 text-xs text-[var(--subtle)]">Unfrozen {unfrozen.data.length} time(s) before.</p>}
       </Card>
 
-      <Card title="Blocklist additions">
-        {blockedAccounts.length === 0 ? (
-          <p className="text-sm text-[var(--subtle)]">No addresses were added to the network Blocklist from this Vault&apos;s incidents.</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {blocked.data!.map((l, i) => (
-              <li key={`${l.transactionHash}-${l.logIndex}`} className="flex flex-wrap items-center gap-2 text-sm">
-                <Mono>{l.args.account}</Mono>
-                {stillBlocked.data?.[i]?.result ? <Badge tone="red">blocked</Badge> : <Badge>expired / removed</Badge>}
-                <span className="text-xs text-[var(--subtle)]">until {new Date(Number(l.args.until) * 1000).toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {(networkBlocked.data?.length ?? 0) > 0 && (
-          <p className="mt-2 text-xs text-[var(--subtle)]">
-            Network-wide: {networkBlocked.data!.length} Blocklist addition(s); every Vault refuses them as destinations.
-          </p>
-        )}
-      </Card>
-
-      <Card title="Recovery options">
-        <div className="flex flex-col gap-4">
-          <section>
-            <h3 className="text-sm font-semibold">Recovery key {roles.isRecovery && <Badge tone="green">connected</Badge>}</h3>
-            <p className="mb-2 text-xs text-[var(--subtle)]">
-              <Mono>{s.recoveryKey}</Mono>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={unfreeze} disabled={!roles.isRecovery || !isFrozen || tx.busy}>
-                {s.institution ? "Unfreeze" : "Unfreeze (Recovery key + Face ID)"}
-              </Button>
-              <Button variant="danger" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "migrate" }, "Migrate")} disabled={!roles.isRecovery || tx.busy || v.status === STATUS.MIGRATED}>
-                Migrate everything to Recovery vault
-              </Button>
-              {s.paused && (
-                <Button variant="secondary" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "unpause" }, "Unpause")} disabled={!roles.isRecovery || tx.busy}>
-                  Unpause
+      {isFrozen && (
+        <Card title="Recovery options">
+          <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm">
+            <li>
+              A majority of wallets votes <strong>Unfreeze</strong> (applies at once). Use this when the alarm was false.
+              {roles.isWallet && (
+                <Button className="ml-2" variant="secondary" disabled={tx.busy} onClick={() => propose(CHANGE.UNFREEZE, "Propose unfreeze")}>
+                  Propose unfreeze
                 </Button>
               )}
-            </div>
-            <p className="mt-1 text-xs text-[var(--subtle)]">
-              Recovery vault (fixed at onboarding): <Mono>{s.recoveryVault}</Mono>. Use Unfreeze for a false positive; Migrate if a key is compromised, then reissue
-              the name onto a fresh Vault with new Hot wallets.
-            </p>
-          </section>
-          <section>
-            <h3 className="text-sm font-semibold">Guardian {roles.isGuardian && <Badge tone="green">connected</Badge>}</h3>
-            <p className="mb-2 text-xs text-[var(--subtle)]">
-              <Mono>{s.guardian === "0x0000000000000000000000000000000000000000" ? "none set" : s.guardian}</Mono> · can only cancel, pause, or evacuate to the
-              Recovery vault.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "pause" }, "Pause")} disabled={!(roles.isGuardian || roles.isRecovery || roles.isHot) || s.paused || tx.busy}>
-                Pause Vault
-              </Button>
-              <Button variant="danger" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "evacuate" }, "Guardian evacuate")} disabled={!roles.isGuardian || tx.busy || v.status === STATUS.MIGRATED}>
-                Evacuate to Recovery vault
-              </Button>
-            </div>
-          </section>
-          {openReqs.length > 0 && (
-            <section>
-              <h3 className="text-sm font-semibold">Open Queued requests</h3>
-              <ul className="mt-1 flex flex-col gap-1">
-                {openReqs.map((r) => (
-                  <li key={r.id.toString()} className="flex flex-wrap items-center gap-2 text-sm">
-                    #{r.id.toString()} to <Mono>{short(r.destination)}</Mono>
-                    <span className="text-xs text-[var(--subtle)]">expires in {formatDuration(Number(r.createdAt) + 7 * 86400 - now)}</span>
-                    <Button variant="ghost" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "cancel", args: [r.id] }, "Cancel request")} disabled={!(roles.isGuardian || roles.isRecovery || roles.isHot) || tx.busy}>
-                      Cancel
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {s.institution && (
-            <Notice tone="gray">
-              If this Institution can&apos;t act, other Members can Vote to extend the Freeze or migrate it to its own Recovery vault. Votes can never choose a destination.
-            </Notice>
-          )}
-          {err && <p className="text-xs text-red-600">{err}</p>}
+            </li>
+            <li>
+              If wallets are compromised: remove them by majority, or a majority votes <strong>Migrate</strong>, sending every USDC to the Recovery vault <Mono>{short(v.s!.recoveryVault)}</Mono>.
+              {roles.isWallet && (
+                <Button className="ml-2" variant="danger" disabled={tx.busy} onClick={() => propose(CHANGE.MIGRATE, "Propose migrate")}>
+                  Propose migrate
+                </Button>
+              )}
+            </li>
+            <li>
+              The Recovery key alone can unfreeze or migrate (it can do nothing else).
+              {roles.isRecovery && (
+                <span className="ml-2 inline-flex gap-2">
+                  <Button variant="secondary" disabled={tx.busy} onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "recoveryUnfreeze" }, "Recovery unfreeze")}>
+                    Unfreeze
+                  </Button>
+                  <Button variant="danger" disabled={tx.busy} onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "recoveryMigrate" }, "Recovery migrate")}>
+                    Migrate
+                  </Button>
+                </span>
+              )}
+            </li>
+          </ol>
           <TxStatus state={tx.state} />
-        </div>
-      </Card>
-      <Link href={`/vault/${v.vault}`} className="text-sm underline">
-        Back to dashboard
-      </Link>
+          <div className="mt-4">
+            <PendingChanges v={v} compact />
+          </div>
+        </Card>
+      )}
     </>
   );
 }

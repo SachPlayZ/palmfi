@@ -8,7 +8,7 @@ import { Button } from "./ui";
 // Mirrors linkMessage() in lib/server/telegram.ts (kept client-side to avoid bundling node:crypto).
 const linkMessage = (vault: Address, issuedAt: number) => `palmfi: link Telegram notifications for Vault ${vault} (issued ${issuedAt})`;
 
-/** Signs a link request as the Vault's owner / Hot wallet and opens the bot deep link (t.me/<bot>?start=<token>). */
+/** Signs a link request as one of the Vault's wallets and opens the bot deep link (t.me/<bot>?start=<token>). */
 export function TelegramLink({ vault }: { vault: Address }) {
   const { signMessageAsync } = useSignMessage();
   const [msg, setMsg] = useState<string>();
@@ -50,7 +50,7 @@ export function TelegramLink({ vault }: { vault: Address }) {
           </a>
         )}
       </div>
-      <p className="text-xs text-[var(--subtle)]">{msg ?? "Get a message on every HOLD, FLAG and pending settings change."}</p>
+      <p className="text-xs text-[var(--subtle)]">{msg ?? "Get a message on every long delay, FLAG and settings change, so you can veto in time."}</p>
     </div>
   );
 }

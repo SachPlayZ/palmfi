@@ -3,246 +3,196 @@ pragma solidity 0.8.29;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {SecondFactorVerifier} from "./SecondFactorVerifier.sol";
 import {PalmTypes as T} from "./libraries/PalmTypes.sol";
-import {IAggregatorV3, IWETH9, IHub, IVault, IVaultFactory, ISafeHarborSwapper} from "./interfaces/IPalm.sol";
+import {IHub, IVault, IVaultFactory} from "./interfaces/IPalm.sol";
 import {ProtectedToken} from "./tokens/ProtectedToken.sol";
-import {ApprovalBook} from "./ApprovalBook.sol";
 import {VaultBase} from "./VaultBase.sol";
 
-/// One Owner's Vault (EIP-1167 clone, immutable once initialized). Holds the Underlying, mints/burns the
-/// Owner's Protected tokens and enforces every spending rule. Institutions and Individuals share this code.
+/// One org's or person's Vault (v2). Instant lane within budget; everything above waits for a delay the Sentinel
+/// sets from its Deviation score (ADR-0009), during which the Vault's own wallets can Veto or Fast-track it
+/// (ADR-0008). USDC only, through its ERC-20 interface (ADR-0011): native value is never accepted.
 contract Vault is VaultBase {
     using SafeERC20 for IERC20;
 
     function initialize(T.VaultConfig calldata c, Wiring calldata w) external {
         if (address(factory) != address(0)) revert Unauthorized();
+        if (c.wallets.length < MIN_WALLETS) revert TooFewWallets();
+        _checkLimits(c.floorDelay, c.maxDelay, c.capDelay);
         factory = IVaultFactory(msg.sender);
         hub = IHub(w.hub);
-        registry = w.registry;
-        weth = w.weth;
         usdc = w.usdc;
-        safetyFund = w.safetyFund;
-        approvalBook = ApprovalBook(w.approvalBook);
-        verifier = SecondFactorVerifier(w.verifier);
         module = w.module;
+        token = w.token;
 
-        owner = c.owner;
-        guardian = c.guardian;
         recoveryKey = c.recoveryKey;
         recoveryVault = c.recoveryVault;
-        approver = c.approver;
-        institution = c.approver != address(0);
-        passkeyX = c.passkeyX;
-        passkeyY = c.passkeyY;
         budget24h = c.budget24h;
         budget7d = c.budget7d;
         hardCap = c.hardCap;
         floorDelay = c.floorDelay;
-        fullDelay = c.fullDelay;
+        maxDelay = c.maxDelay;
+        capDelay = c.capDelay;
         bizStartHourUtc = c.bizStartHourUtc;
         bizEndHourUtc = c.bizEndHourUtc;
         usualMaxPayout = c.usualMaxPayout;
 
-        for (uint256 i; i < c.hotWallets.length; i++) {
-            _addHotWallet(c.hotWallets[i]);
+        for (uint256 i; i < c.wallets.length; i++) {
+            _addWallet(c.wallets[i]);
         }
-        defaultReceiver = c.defaultReceiver == address(0) ? c.hotWallets[0] : c.defaultReceiver;
-        if (!isHotWallet[defaultReceiver]) revert NotHotWallet();
+        if (_wallets.length < MIN_WALLETS) revert TooFewWallets(); // duplicates
         for (uint256 i; i < c.destinations.length; i++) {
             isDestination[c.destinations[i]] = true;
         }
         for (uint256 i; i < w.defaultDelegates.length; i++) {
             isApprovedDelegate[w.defaultDelegates[i]] = true;
         }
-
-        for (uint256 i; i < w.underlyings.length; i++) {
-            address u = w.underlyings[i];
-            _underlyings.push(u);
-            assets[u] = Asset(w.tokens[i], w.feeds[i], w.heartbeats[i], IERC20Metadata(u).decimals());
-        }
     }
 
-    function deposit(address underlying, uint256 amount, address to) external {
+    // ------------------------------------------------------------------
+    // Deposits
+    // ------------------------------------------------------------------
+
+    /// USDC in (ERC-20 only), Protected tokens out to one of this Vault's wallets.
+    function deposit(uint256 amount, address to) external {
         if (amount == 0) revert ZeroAmount();
-        Asset memory a = _asset(underlying);
-        IERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
-        ProtectedToken(a.token).mint(to, amount);
+        IERC20(usdc).safeTransferFrom(msg.sender, address(this), amount);
+        ProtectedToken(token).mint(to, amount);
     }
 
-    function depositETH(address to) external payable {
-        if (msg.value == 0) revert ZeroAmount();
-        IWETH9(weth).deposit{value: msg.value}();
-        ProtectedToken(assets[weth].token).mint(to, msg.value);
-    }
+    // ------------------------------------------------------------------
+    // Instant lane
+    // ------------------------------------------------------------------
 
-    function unwrap(address underlying, uint256 amount, address destination, bool asWeth)
-        external
-        onlyHot
-        outflowsOpen
-    {
+    function unwrap(uint256 amount, address destination) external onlyWallet outflowsOpen {
         if (amount == 0) revert ZeroAmount();
         if (hub.isBlocked(destination)) revert Blocklisted(destination);
-        _spendInstant(underlying, amount);
-        ProtectedToken(assets[underlying].token).burn(msg.sender, amount);
-        _payout(underlying, amount, destination, asWeth);
+        _spendInstant(amount);
+        ProtectedToken(token).burn(msg.sender, amount);
+        _record(msg.sender, destination, amount);
+        hub.emitOutflow(msg.sender, destination, amount, false);
+        IERC20(usdc).safeTransfer(destination, amount);
     }
 
-    /// Network transfer within the Instant budget (ADR-0001). Above budget, use requestUnwrap(payee vault).
-    function networkTransfer(address underlying, uint256 amount, address payeeVault) external onlyHot outflowsOpen {
+    /// Direct vault-to-vault payment within the Instant budget (the Orbital pool is the composable route).
+    function pay(address payeeVault, uint256 amount) external onlyWallet outflowsOpen {
         if (amount == 0) revert ZeroAmount();
-        if (!factory.isVault(payeeVault) || payeeVault == address(this)) revert NotFactoryVault();
-        _spendInstant(underlying, amount);
-        ProtectedToken(assets[underlying].token).burn(msg.sender, amount);
-        _payout(underlying, amount, payeeVault, true);
+        _spendInstant(amount);
+        ProtectedToken(token).burn(msg.sender, amount);
+        _record(msg.sender, payeeVault, amount);
+        hub.emitOutflow(msg.sender, payeeVault, amount, false);
+        _payVault(payeeVault, amount);
     }
 
-    function _spendInstant(address underlying, uint256 amount) internal returns (uint256 usd) {
-        _asset(underlying);
-        if (_degraded(underlying)) revert Degraded(underlying);
-        bool stale;
-        (usd, stale) = valueUsd(underlying, amount);
-        if (stale) revert FeedStale(underlying);
-        (uint256 u24, uint256 u7) = _usage();
-        uint256 avail = _available(u24, u7);
-        if (usd > avail) revert OverBudget(usd, avail);
-        used24h = uint128(u24 + usd);
-        used7d = uint128(u7 + usd);
-        lastSpendAt = uint64(block.timestamp);
-    }
-
-    function _usage() internal view returns (uint256 u24, uint256 u7) {
-        uint256 elapsed = block.timestamp - lastSpendAt;
-        uint256 refill24 = elapsed * budget24h / 1 days;
-        uint256 refill7 = elapsed * budget7d / 7 days;
-        u24 = used24h > refill24 ? used24h - refill24 : 0;
-        u7 = used7d > refill7 ? used7d - refill7 : 0;
-    }
-
-    function _available(uint256 u24, uint256 u7) internal view returns (uint256) {
-        if (sensitivePending > 0) return 0;
-        uint256 a24 = budget24h > u24 ? budget24h - u24 : 0;
-        uint256 a7 = budget7d > u7 ? budget7d - u7 : 0;
-        return a24 < a7 ? a24 : a7;
-    }
-
-    /// Remaining shared USD Instant budget (6dp) right now.
-    function availableBudgetUsd() public view returns (uint256) {
+    /// Remaining Instant budget (USDC, 6dp) right now.
+    function availableBudget() public view returns (uint256) {
         (uint256 u24, uint256 u7) = _usage();
         return _available(u24, u7);
     }
 
-    /// Effective Market mode: the Reconciler's mode, forced to Degraded when the feed is stale.
-    function marketModeOf(address underlying) external view returns (uint8) {
-        return _degraded(underlying) ? T.MODE_DEGRADED : hub.marketMode(underlying);
+    function _payVault(address payeeVault, uint256 amount) internal {
+        if (!factory.isVault(payeeVault) || payeeVault == address(this)) revert NotFactoryVault();
+        IERC20(usdc).safeTransfer(payeeVault, amount);
+        IVault(payeeVault).receivePayment(amount);
     }
 
-    function _payout(address underlying, uint256 amount, address destination, bool asWeth) internal {
-        if (factory.isVault(destination)) {
-            IERC20(underlying).safeTransfer(destination, amount);
-            IVault(destination).receiveNetworkTransfer(underlying, amount);
-            hub.emitNetworkTransfer(destination, underlying, amount);
-        } else if (underlying == weth && !asWeth) {
-            IWETH9(weth).withdraw(amount);
-            (bool ok,) = destination.call{value: amount}("");
-            if (!ok) revert EthSendFailed();
-        } else {
-            IERC20(underlying).safeTransfer(destination, amount);
-        }
-    }
-
-    /// Accepted even while Frozen; only from factory Vaults, and only if the Underlying actually arrived.
-    function receiveNetworkTransfer(address underlying, uint256 amount) external {
+    /// Payee side. Accepted even while Frozen; only from factory Vaults, and only if the USDC actually arrived.
+    function receivePayment(uint256 amount) external {
         if (!factory.isVault(msg.sender)) revert NotFactoryVault();
         uint8 s = hub.statusOf(address(this));
         if (s != T.STATUS_ACTIVE && s != T.STATUS_FROZEN) revert NotActive();
-        Asset memory a = _asset(underlying);
-        if (IERC20(underlying).balanceOf(address(this)) < ProtectedToken(a.token).totalSupply() + amount) {
-            revert ReservesShort();
-        }
-        ProtectedToken(a.token).mint(defaultReceiver, amount);
+        _mintBacked(_wallets[0], amount);
     }
 
-    function requestUnwrap(address underlying, uint256 amount, address destination, bool asWeth)
-        external
-        payable
-        onlyHot
+    function _mintBacked(address to, uint256 amount) internal {
+        if (IERC20(usdc).balanceOf(address(this)) < ProtectedToken(token).totalSupply() + amount) {
+            revert ReservesShort();
+        }
+        ProtectedToken(token).mint(to, amount);
+    }
+
+    // ------------------------------------------------------------------
+    // Queued lane
+    // ------------------------------------------------------------------
+
+    function requestUnwrap(uint256 amount, address destination) external returns (uint256) {
+        return _queue(T.KIND_UNWRAP, amount, destination);
+    }
+
+    function requestPayment(address payeeVault, uint256 amount) external returns (uint256) {
+        if (!factory.isVault(payeeVault) || payeeVault == address(this)) revert NotFactoryVault();
+        return _queue(T.KIND_PAYMENT, amount, payeeVault);
+    }
+
+    /// Default delay is MaxDelay: until the Sentinel scores it, the slowest path applies (unsure → slow).
+    function _queue(uint8 kind, uint256 amount, address destination)
+        internal
+        onlyWallet
         outflowsOpen
         returns (uint256 id)
     {
         if (amount == 0) revert ZeroAmount();
-        if (msg.value != BOND) revert BadBond();
-        if (pendingCount >= (institution ? 10 : 3)) revert TooManyPending();
-        _asset(underlying);
+        if (pendingOf[msg.sender] >= MAX_PENDING_PER_WALLET) revert TooManyPending();
 
-        (uint256 usd, bool stale) = valueUsd(underlying, amount);
-        uint256 codes;
-        if (!isDestination[destination]) codes |= T.NEW_DESTINATION;
+        uint256 codes = T.CRE_SILENT;
+        if (!isDestination[destination] && destinationCount[destination] == 0) codes |= T.NEW_DESTINATION;
         if (hub.isBlocked(destination)) codes |= T.BLOCKLISTED_DEST;
-        if (sensitivePending > 0) codes |= T.CONFIG_CHANGE_PENDING;
-        if (stale || _degraded(underlying)) codes |= T.ORACLE_STALE;
-        if (usd > availableBudgetUsd()) codes |= T.OVER_BUDGET;
+        if (pendingWalletAdds > 0) codes |= T.CONFIG_CHANGE_PENDING;
+        if (block.timestamp < walletAddedAt[msg.sender] + 7 days) codes |= T.NEW_WALLET;
+        if (amount > hardCap) codes |= T.OVER_HARD_CAP;
 
-        ProtectedToken(assets[underlying].token).burn(msg.sender, amount); // escrow by burning
+        ProtectedToken(token).burn(msg.sender, amount + BOND); // escrow by burning
         id = ++nextRequestId;
-        bytes32 h = T.hashRequest(address(this), id, underlying, amount, destination);
-        _requests[id] = Request({
-            asset: underlying,
-            destination: destination,
-            requester: msg.sender,
-            amount: uint128(amount),
-            usdValue: uint128(usd),
-            createdAt: uint64(block.timestamp),
-            executableAt: 0,
-            state: T.REQ_PENDING,
-            asWeth: asWeth,
-            secondFactor: false,
-            recoveryApproved: false,
-            reasonCodes: codes,
-            requestHash: h
-        });
-        pendingCount++;
+        bytes32 h = T.hashRequest(address(this), id, kind, amount, destination);
+        Request storage r = _requests[id];
+        r.destination = destination;
+        r.requester = msg.sender;
+        r.amount = uint128(amount);
+        r.createdAt = uint64(block.timestamp);
+        r.executableAt = uint64(block.timestamp + maxDelay);
+        r.state = T.REQ_PENDING;
+        r.kind = kind;
+        r.voterCount = uint16(_wallets.length);
+        r.reasonCodes = codes;
+        r.requestHash = h;
+        pendingOf[msg.sender]++;
         _open.push(id);
         _openIndex[id] = _open.length;
-        hub.emitUnwrapRequested(id, h, underlying, amount, destination, usd, codes);
+        hub.emitRequestQueued(id, h, kind, msg.sender, amount, destination, codes);
     }
 
-    /// Records a Second factor for a request: an Individual's passkey (WebAuthn over the request hash)
-    /// or an Institution's Payout approval (EIP-712, ADR-0002). Anyone may submit; the signature is the auth.
-    function confirm(uint256 id, bytes calldata sig) external {
+    /// One wallet, one vote, on the voter set at creation. Veto: >50% NO of the wallets other than the
+    /// requester. Fast-track: >50% YES of all wallets → executable at the Floor.
+    function vote(uint256 id, bool yes) external {
         Request storage r = _requests[id];
-        if (r.state != T.REQ_PENDING && r.state != T.REQ_HELD && r.state != T.REQ_CLEARED) revert BadState();
-        if (institution) {
-            (uint64 expiry, bytes memory ecdsaSig) = abi.decode(sig, (uint64, bytes));
-            if (expiry < block.timestamp) revert BadSignature();
-            bytes32 digest =
-                approvalBook.payoutDigest(address(this), r.requestHash, r.amount, r.asset, r.destination, expiry);
-            if (!verifier.verifyEcdsa(digest, ecdsaSig, approver)) revert BadSignature();
-        } else {
-            if (!verifier.verifyPasskey(r.requestHash, sig, passkeyX, passkeyY)) revert BadSignature();
-        }
-        r.secondFactor = true;
-        if (r.state == T.REQ_HELD) {
-            r.executableAt = uint64(r.createdAt + fullDelay);
-        } else if (r.state == T.REQ_CLEARED && r.usdValue > hardCap) {
+        if (r.state != T.REQ_PENDING) revert BadState();
+        _checkWallet(msg.sender);
+        if (walletAddedAt[msg.sender] > r.createdAt) revert NotEligible();
+        if (hasVoted[id][msg.sender]) revert AlreadyVoted();
+        if (!yes && msg.sender == r.requester) revert NotEligible(); // the requester cancels instead
+        hasVoted[id][msg.sender] = true;
+        if (yes) r.yes++;
+        else r.no++;
+        hub.emitVoted(id, msg.sender, yes, r.yes, r.no);
+
+        if (_majority(r.no, r.voterCount - 1)) {
+            _close(id, r, T.REQ_VETOED, true);
+        } else if (!r.fastTracked && _majority(r.yes, r.voterCount)) {
+            r.fastTracked = true;
             r.executableAt = uint64(r.createdAt + floorDelay);
+            hub.emitRequestUpdated(id, r.state, r.executableAt, r.score, r.reasonCodes);
         }
-        hub.emitSecondFactorConfirmed(id, r.requestHash);
-        hub.emitRequestUpdated(id, r.state, r.executableAt, r.reasonCodes);
     }
 
     function cancel(uint256 id) external {
         Request storage r = _requests[id];
-        if (!isHotWallet[msg.sender] && msg.sender != guardian && msg.sender != recoveryKey) revert Unauthorized();
-        if (isHotWallet[msg.sender]) _checkHot(msg.sender);
-        if (!_isOpen(r.state)) revert BadState();
+        if (msg.sender != r.requester) revert Unauthorized();
+        if (r.state != T.REQ_PENDING) revert BadState();
         _close(id, r, T.REQ_CANCELLED, true);
     }
 
     function expire(uint256 id) external {
         Request storage r = _requests[id];
-        if (!_isOpen(r.state) || block.timestamp <= r.createdAt + REQUEST_TTL) revert BadState();
+        if (r.state != T.REQ_PENDING || block.timestamp <= r.createdAt + REQUEST_TTL) revert BadState();
         _close(id, r, T.REQ_EXPIRED, true);
     }
 
@@ -251,80 +201,75 @@ contract Vault is VaultBase {
         Request storage r = _requests[id];
         if (!isExecutable(id)) revert NotExecutable();
         if (hub.isBlocked(r.destination)) revert Blocklisted(r.destination);
-        address requester = r.requester;
         r.state = T.REQ_EXECUTED;
         _removeOpen(id);
-        pendingCount--;
-        hub.emitRequestUpdated(id, T.REQ_EXECUTED, r.executableAt, r.reasonCodes);
-        _payout(r.asset, r.amount, r.destination, r.asWeth);
-        _sendEth(requester, BOND);
+        pendingOf[r.requester]--;
+        _record(r.requester, r.destination, r.amount);
+        hub.emitRequestUpdated(id, T.REQ_EXECUTED, r.executableAt, r.score, r.reasonCodes);
+        hub.emitOutflow(r.requester, r.destination, r.amount, false);
+        ProtectedToken(token).mint(_returnTo(r.requester), BOND);
+        if (r.kind == T.KIND_PAYMENT) _payVault(r.destination, r.amount);
+        else IERC20(usdc).safeTransfer(r.destination, r.amount);
     }
 
     function isExecutable(uint256 id) public view returns (bool) {
         Request storage r = _requests[id];
-        if (block.timestamp > r.createdAt + REQUEST_TTL) return false;
-        if (r.state == T.REQ_CLEARED || r.state == T.REQ_HELD) {
-            return r.executableAt != 0 && block.timestamp >= r.executableAt;
-        }
-        if (r.state == T.REQ_PENDING) {
-            if (institution) {
-                return r.secondFactor && r.recoveryApproved && block.timestamp >= r.createdAt + floorDelay;
-            }
-            return block.timestamp >= r.createdAt + FAIL_OPEN_DELAY;
-        }
-        return false;
+        return
+            r.state == T.REQ_PENDING && block.timestamp >= r.executableAt
+                && block.timestamp <= r.createdAt + REQUEST_TTL;
     }
 
-    /// Applies a Sentinel Verdict (spec §6.3 table). Never reverts on content: returns a reject reason instead.
-    function applyVerdict(uint256 id, bytes32 requestHash, uint8 verdict, uint256 reasonCodes)
+    /// Sentinel delay (Hub-only). Clamped to [Floor, MaxDelay]; above the Hard cap at least CapDelay.
+    /// A majority Fast-track beats the Sentinel.
+    function applyDelay(uint256 id, bytes32 requestHash, uint64 delay, uint32 score, uint256 reasonCodes)
         external
-        returns (uint8 reject, address destination)
+        returns (uint8)
+    {
+        if (msg.sender != address(hub)) revert NotHub();
+        Request storage r = _requests[id];
+        if (r.state == T.REQ_NONE) return T.REJECT_UNKNOWN_REQUEST;
+        if (r.requestHash != requestHash) return T.REJECT_HASH_MISMATCH;
+        if (r.state != T.REQ_PENDING) return T.REJECT_TERMINAL;
+        if (r.fastTracked) return T.REJECT_FAST_TRACKED;
+        if (delay < floorDelay) delay = floorDelay;
+        if (delay > maxDelay) delay = maxDelay;
+        if (r.amount > hardCap && delay < capDelay) delay = capDelay;
+        r.scored = true;
+        r.score = score;
+        r.reasonCodes = reasonCodes;
+        r.executableAt = uint64(r.createdAt + delay);
+        hub.emitRequestUpdated(id, r.state, r.executableAt, score, reasonCodes);
+        return 0;
+    }
+
+    /// Sentinel FLAG (Hub-only): the request dies and its bond is forfeited; the Hub freezes the Vault.
+    function applyFlag(uint256 id, bytes32 requestHash, uint32 score, uint256 reasonCodes)
+        external
+        returns (uint8, address)
     {
         if (msg.sender != address(hub)) revert NotHub();
         Request storage r = _requests[id];
         if (r.state == T.REQ_NONE) return (T.REJECT_UNKNOWN_REQUEST, address(0));
         if (r.requestHash != requestHash) return (T.REJECT_HASH_MISMATCH, address(0));
-        destination = r.destination;
-        if (!_isOpen(r.state)) return (T.REJECT_TERMINAL, destination);
+        if (r.state != T.REQ_PENDING) return (T.REJECT_TERMINAL, r.destination);
+        r.score = score;
         r.reasonCodes = reasonCodes;
-
-        if (verdict == T.VERDICT_FLAG) {
-            r.state = T.REQ_FLAGGED;
-            r.executableAt = 0;
-            _removeOpen(id);
-            pendingCount--;
-            ProtectedToken(assets[r.asset].token).mint(_returnTo(r.requester), r.amount); // funds stay in the Vault
-            _sendEth(safetyFund, BOND); // forfeited bond
-        } else if (verdict == T.VERDICT_CLEAR) {
-            r.state = T.REQ_CLEARED;
-            bool needs2fa = r.usdValue > hardCap;
-            r.executableAt = uint64(r.createdAt + ((needs2fa && !r.secondFactor) ? fullDelay : floorDelay));
-        } else if (verdict == T.VERDICT_HOLD) {
-            if (r.state == T.REQ_CLEARED) return (T.REJECT_TERMINAL, destination); // CLEAR→HOLD not allowed
-            r.state = T.REQ_HELD;
-            r.executableAt = r.secondFactor ? uint64(r.createdAt + fullDelay) : 0;
-        } else {
-            return (T.REJECT_BAD_VERDICT, destination);
-        }
-        hub.emitRequestUpdated(id, r.state, r.executableAt, reasonCodes);
+        _close(id, r, T.REQ_FLAGGED, false);
+        return (0, r.destination);
     }
 
-    function _isOpen(uint8 s) internal pure returns (bool) {
-        return s == T.REQ_PENDING || s == T.REQ_CLEARED || s == T.REQ_HELD;
-    }
-
-    function _close(uint256 id, Request storage r, uint8 state, bool refund) internal {
+    function _close(uint256 id, Request storage r, uint8 state, bool refundBond) internal {
         r.state = state;
         r.executableAt = 0;
         _removeOpen(id);
-        pendingCount--;
-        ProtectedToken(assets[r.asset].token).mint(_returnTo(r.requester), r.amount);
-        if (refund) _sendEth(r.requester, BOND);
-        hub.emitRequestUpdated(id, state, 0, r.reasonCodes);
+        pendingOf[r.requester]--;
+        // Funds never left the Vault: re-mint the escrow (the bond only when it isn't forfeited).
+        ProtectedToken(token).mint(_returnTo(r.requester), refundBond ? r.amount + BOND : r.amount);
+        hub.emitRequestUpdated(id, state, 0, r.score, r.reasonCodes);
     }
 
     function _returnTo(address requester) internal view returns (address) {
-        return isHotWallet[requester] ? requester : defaultReceiver;
+        return isWallet[requester] ? requester : _wallets[0];
     }
 
     function _removeOpen(uint256 id) internal {
@@ -337,43 +282,64 @@ contract Vault is VaultBase {
         delete _openIndex[id];
     }
 
-    modifier onlyHook() {
-        if (msg.sender != factory.hook()) revert NotHook();
-        _;
+    // ------------------------------------------------------------------
+    // Freeze (any one wallet; unfreeze needs a majority or the Recovery key, in the VaultModule)
+    // ------------------------------------------------------------------
+
+    function freeze() external onlyWallet {
+        hub.vaultFreeze(msg.sender);
     }
 
-    /// The hook has already delivered `amount` Underlying to this Vault; mint the Protected token into the
-    /// PoolManager. It can only leave the PoolManager to one of this Owner's Hot wallets (ADR-0006).
-    function hookWrap(address underlying, uint256 amount) external onlyHook {
-        Asset memory a = _asset(underlying);
-        if (IERC20(underlying).balanceOf(address(this)) < ProtectedToken(a.token).totalSupply() + amount) {
+    function isFrozen() public view returns (bool) {
+        return hub.statusOf(address(this)) != T.STATUS_ACTIVE;
+    }
+
+    function canSettleOut() public view returns (bool) {
+        uint8 s = hub.statusOf(address(this));
+        return s == T.STATUS_ACTIVE || s == T.STATUS_MIGRATED;
+    }
+
+    // ------------------------------------------------------------------
+    // Orbital pool seam (#33; IOrbitalVault)
+    // ------------------------------------------------------------------
+
+    /// A wallet's swap into the pool is an outflow: it uses the same Instant budget as an Unwrap, so an
+    /// attacker can't exit through a token of an org they onboarded themselves.
+    function chargeOutflow(address wallet, uint256 amount) external onlyHook outflowsOpen {
+        _checkWallet(wallet);
+        _spendInstant(amount);
+        _record(wallet, msg.sender, amount);
+        hub.emitOutflow(wallet, msg.sender, amount, true);
+    }
+
+    /// Settlement, issuer side: the hook has just moved `amount` of this Vault's tokens out of the pool to this
+    /// Vault; burn them and send their USDC backing to `toVault`. Halts while Frozen (a frozen token is a depeg);
+    /// a Migrated Vault still settles, from the USDC it kept back for exactly these tokens.
+    function settleOut(uint256 amount, address toVault) external onlyHook {
+        if (!canSettleOut()) revert NotActive();
+        if (!factory.isVault(toVault) || toVault == address(this)) revert NotFactoryVault();
+        ProtectedToken(token).burn(address(this), amount);
+        IERC20(usdc).safeTransfer(toVault, amount);
+    }
+
+    /// Settlement, receiving side: USDC already arrived from the issuer; mint the same amount into the pool.
+    function settleIn(uint256 amount) external onlyHook {
+        if (IERC20(usdc).balanceOf(address(this)) < ProtectedToken(token).totalSupply() + amount) {
             revert ReservesShort();
         }
-        ProtectedToken(a.token).mint(ProtectedToken(a.token).poolManager(), amount);
-        hub.emitHookSwap(address(0), underlying, amount, false, 0);
+        ProtectedToken(token).mint(ProtectedToken(token).poolManager(), amount);
     }
 
-    /// The hook has moved `amount` Protected tokens from the PoolManager to this Vault. Charge the real
-    /// swapper's Instant budget, burn, and send the Underlying to the PoolManager for settlement.
-    function hookUnwrap(address underlying, uint256 amount, address swapper) external onlyHook outflowsOpen {
-        _checkHot(swapper);
-        uint256 usd = _spendInstant(underlying, amount);
-        ProtectedToken t = ProtectedToken(assets[underlying].token);
-        t.burn(address(this), amount);
-        IERC20(underlying).safeTransfer(t.poolManager(), amount);
-        hub.emitHookSwap(swapper, underlying, amount, true, usd);
+    // ------------------------------------------------------------------
+    // Views
+    // ------------------------------------------------------------------
+
+    function wallets() external view returns (address[] memory) {
+        return _wallets;
     }
 
-    function protectedToken(address underlying) external view returns (address) {
-        return assets[underlying].token;
-    }
-
-    function underlyings() external view returns (address[] memory) {
-        return _underlyings;
-    }
-
-    function hotWallets() external view returns (address[] memory) {
-        return _hotWallets;
+    function walletCount() external view returns (uint256) {
+        return _wallets.length;
     }
 
     function getRequest(uint256 id) external view returns (Request memory) {
@@ -384,8 +350,9 @@ contract Vault is VaultBase {
         return _open;
     }
 
-    /// Settings, recovery, Safe-harbor and Reconciler views live in the VaultModule (same storage layout).
-    fallback() external payable {
+    /// Settings, votes on changes, recovery and Sentinel/Reconciler views live in the VaultModule (same storage
+    /// layout). Native value is rejected: USDC is accounted only through its ERC-20 interface.
+    fallback() external {
         address m = module;
         assembly {
             calldatacopy(0, 0, calldatasize())

@@ -1,122 +1,113 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.29;
 
-import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
+import {NetworkTest} from "./base/NetworkTest.sol";
+import {PalmTypes as T} from "../src/libraries/PalmTypes.sol";
 import {Vault} from "../src/Vault.sol";
 import {VaultBase} from "../src/VaultBase.sol";
-import {PalmTypes} from "../src/libraries/PalmTypes.sol";
+import {Hub} from "../src/Hub.sol";
+import {VaultFactory} from "../src/VaultFactory.sol";
 
-interface IFeedLike {
-    function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80);
-}
-
-/// Ticket #3: Alice onboards, deposits USDC, unwraps within her shared USD Instant budget.
+/// Tracer: an org onboards on Arc, deposits USDC (ERC-20 only), spends within the Instant budget, pays another org.
 contract TracerTest is NetworkTest {
-    function test_onboardingCreatesVaultTokenHubAndEnsName() public {
-        Vault v = onboardAlice();
-        assertTrue(factory().isVault(address(v)));
-        assertEq(hub().statusOf(address(v)), PalmTypes.STATUS_ACTIVE);
-        assertEq(usdcToken(v).symbol(), "pUSDC");
-        assertEq(usdcToken(v).vault(), address(v));
-
-        assertEq(ensAddr("alice"), address(v));
-        assertEq(urAddr("alice"), address(v), "live Universal Resolver walks palmfi.eth -> our registry");
-        assertEq(ensText("alice", "type"), "personal");
-        assertEq(ensText("alice", "status"), "active");
-        assertEq(ensText("alice", "verified"), "false");
-        assertGt(bytes(ensText("alice", "tokens")).length, 0);
+    function test_onboard_registersNameAndToken() public {
+        Vault v = onboard("nvidia", 5);
+        assertEq(hub().resolve("nvidia"), address(v));
+        assertEq(hub().statusOf(address(v)), T.STATUS_ACTIVE);
+        assertEq(v.walletCount(), 5);
+        assertEq(tokenOf(v).vault(), address(v));
+        assertEq(tokenOf(v).decimals(), 6);
     }
 
-    function test_onboardingRequiresFeeAndUniqueName() public {
-        Vault v = onboardAlice();
-        v;
-        vm.deal(owner, 1 ether);
-        vm.prank(owner);
-        vm.expectRevert(VaultFactoryErrors.NameTaken.selector);
-        factory().createVault{value: FEE}("alice", individualConfig(owner, hotWallet));
-        vm.prank(owner);
-        vm.expectRevert(VaultFactoryErrors.BadFee.selector);
-        factory().createVault{value: 0}("alice2", individualConfig(owner, hotWallet));
+    function test_onboard_rejectsFewerThanThreeWallets() public {
+        vm.expectRevert(VaultBase.TooFewWallets.selector);
+        factory().createVault("duo", config(wallets(2)));
     }
 
-    function test_ownerChosenLimitsAreStored() public {
-        Vault v = onboardAlice();
-        assertEq(v.budget24h(), 5e6);
-        assertEq(v.budget7d(), 20e6);
-        assertEq(v.hardCap(), 50e6);
-        assertEq(v.availableBudgetUsd(), 5e6);
+    function test_names_firstComeAndVerifiedByAdmin() public {
+        Vault v = onboard("nvidia", 3);
+        vm.expectRevert(Hub.NameTaken.selector);
+        factory().createVault("nvidia", config(wallets(3)));
+        vm.expectRevert(Hub.BadName.selector);
+        factory().createVault("Nvidia", config(wallets(3)));
+
+        vm.expectRevert(Hub.NotAdmin.selector);
+        hub().setVerified(address(v), true);
+        vm.prank(deployer);
+        hub().setVerified(address(v), true);
+        assertTrue(hub().verified(address(v)));
     }
 
-    function test_depositMintsOneToOne() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        assertEq(usdcToken(v).balanceOf(hotWallet), 30e6);
-        assertEq(IERC20Like(ext.usdc).balanceOf(address(v)), 30e6);
+    function test_depositAndInstantUnwrap() public {
+        Vault v = onboard("nvidia", 3);
+        depositUsdc(v, w[0], 1_000e6);
+        assertEq(tokenOf(v).balanceOf(w[0]), 1_000e6);
+        assertEq(usdcBalance(address(v)), 1_000e6);
+
+        vm.prank(w[0]);
+        v.unwrap(400e6, outsider);
+        assertEq(usdcBalance(outsider), 400e6);
+        assertEq(tokenOf(v).balanceOf(w[0]), 600e6);
+        assertEq(v.availableBudget(), 100e6);
+        assertEq(v.historyCount(), 1);
+
+        vm.prank(w[0]);
+        vm.expectRevert(abi.encodeWithSelector(VaultBase.OverBudget.selector, 200e6, 100e6));
+        v.unwrap(200e6, outsider);
     }
 
-    function test_unwrapWithinBudgetSucceedsImmediately() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        vm.prank(hotWallet);
-        v.unwrap(ext.usdc, 3e6, payee, false);
-        assertEq(IERC20Like(ext.usdc).balanceOf(payee), 3e6);
-        assertEq(usdcToken(v).balanceOf(hotWallet), 27e6);
-        assertApproxEqAbs(v.availableBudgetUsd(), 2e6, 0.05e6); // USDC/USD ~ $1
+    function test_nativeValueRejected() public {
+        Vault v = onboard("nvidia", 3);
+        fundUsdc(w[0], 10e6);
+        vm.prank(w[0]);
+        (bool ok,) = address(v).call{value: 1e18}("");
+        assertFalse(ok);
     }
 
-    function test_unwrapOverBudgetReverts() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        vm.prank(hotWallet);
-        vm.expectPartialRevert(VaultBase.OverBudget.selector);
-        v.unwrap(ext.usdc, 6e6, payee, false);
-    }
-
-    function test_budgetRefillsLinearly() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        vm.prank(hotWallet);
-        v.unwrap(ext.usdc, 4.9e6, payee, false);
-        uint256 a0 = v.availableBudgetUsd();
-        skip(12 hours); // half of the 24h window
-        uint256 a1 = v.availableBudgetUsd();
-        assertApproxEqAbs(a1 - a0, 2.5e6, 0.01e6, "refills $2.50 in 12h on a $5/24h budget");
-        // the feed may now be past its heartbeat in the fork; only check budget math here
-    }
-
-    function test_staleFeedBlocksInstantLane() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        (,,, uint256 updatedAt,) = IFeedLike(ext.usdcUsdFeed).latestRoundData();
-        vm.warp(updatedAt + 86400 + 1 hours + 1); // past heartbeat + 1h margin
-        vm.prank(hotWallet);
-        vm.expectRevert(abi.encodeWithSelector(VaultBase.Degraded.selector, ext.usdc));
-        v.unwrap(ext.usdc, 1e6, payee, false);
-    }
-
-    function test_nonHotWalletCannotUnwrap() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
+    function test_onlyWalletsSpend() public {
+        Vault v = onboard("nvidia", 3);
+        depositUsdc(v, w[0], 100e6);
         vm.prank(attacker);
-        vm.expectRevert(VaultBase.NotHotWallet.selector);
-        v.unwrap(ext.usdc, 1e6, attacker, false);
+        vm.expectRevert(VaultBase.NotWallet.selector);
+        v.unwrap(1e6, attacker);
     }
 
-    function test_factoryAdminHasNoPathToVaultFunds() public {
-        Vault v = onboardAlice();
-        depositUsdc(v, hotWallet, 30e6);
-        vm.startPrank(deployer);
-        vm.expectRevert(VaultBase.NotHotWallet.selector);
-        v.unwrap(ext.usdc, 1e6, deployer, false);
-        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
-        mod(v).migrate();
-        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
-        mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(deployer));
-        vm.stopPrank();
-    }
-}
+    function test_instantPaymentBetweenVaults() public {
+        Vault n = onboard("nvidia", 3);
+        Vault p = Vault(factory().createVault("palantir", config(_ws("pal", 3))));
+        address payer = p.wallets()[0];
+        depositUsdc(p, payer, 300e6);
 
-interface VaultFactoryErrors {
-    error NameTaken();
-    error BadFee();
+        vm.prank(payer);
+        p.pay(address(n), 250e6);
+        assertEq(usdcBalance(address(n)), 250e6);
+        assertEq(tokenOf(n).balanceOf(n.wallets()[0]), 250e6);
+        assertEq(tokenOf(p).totalSupply(), 50e6);
+    }
+
+    function test_blocklistedDestinationRefused() public {
+        Vault v = onboard("nvidia", 3);
+        depositUsdc(v, w[0], 1_000e6);
+        vm.prank(w[0]);
+        uint256 id = v.requestUnwrap(900e6, attacker);
+        vm.prank(deployer);
+        hub().setVerified(address(v), true); // only a verified Vault's FLAG blocklists network-wide
+        flag(v, id, T.BLOCKLISTED_DEST);
+        assertTrue(hub().isBlocked(attacker));
+        assertEq(hub().statusOf(address(v)), T.STATUS_FROZEN);
+
+        Vault other = Vault(factory().createVault("palantir", config(_ws("pal", 3))));
+        address payer = other.wallets()[0];
+        depositUsdc(other, payer, 100e6);
+        vm.prank(payer);
+        vm.expectRevert(abi.encodeWithSelector(VaultBase.Blocklisted.selector, attacker));
+        other.unwrap(10e6, attacker);
+    }
+
+    function _ws(string memory p, uint256 n) internal returns (address[] memory out) {
+        out = new address[](n);
+        for (uint256 i; i < n; i++) {
+            out[i] = makeAddr(string.concat(p, vm.toString(i)));
+        }
+    }
 }

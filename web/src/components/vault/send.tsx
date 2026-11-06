@@ -1,117 +1,58 @@
 "use client";
 
 import { useState } from "react";
-import { isAddress, type Address } from "viem";
-import { useEnsAddress, useReadContract } from "wagmi";
-import { sepolia } from "wagmi/chains";
-import { vaultAbi, vaultFactoryAbi } from "@/abi";
-import { deployments } from "@/lib/deployments";
-import { toFullName } from "@/lib/ens";
-import { BOND_WEI, formatUsd } from "@/lib/palm";
+import { vaultAbi } from "@/abi";
+import { BOND, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
-import { Badge, Button, Card, Field, Input, Mono, Notice, Select } from "../ui";
-import { assetLabel, fmtAmount, isWeth, safeParse, useRoles } from "./common";
+import { Badge, Button, Card, Field, Input, Mono, Notice } from "../ui";
+import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./common";
 
-/** Resolves an address or a name (alice → alice.palmfi.eth) through ENS on Sepolia. */
-export function useDestination(input: string) {
-  const trimmed = input.trim();
-  const direct = isAddress(trimmed) ? (trimmed as Address) : undefined;
-  const name = !direct && trimmed ? toFullName(trimmed) : null;
-  const ens = useEnsAddress({ name: name ?? undefined, chainId: sepolia.id, query: { enabled: !!name } });
-  const address = direct ?? ((ens.data ?? undefined) as Address | undefined);
-  const isVault = useReadContract({
-    address: deployments.factory,
-    abi: vaultFactoryAbi,
-    functionName: "isVault",
-    args: [address!],
-    chainId: sepolia.id,
-    query: { enabled: !!address && !!deployments.factory },
-  });
-  return { address, name, resolving: ens.isLoading, isVault: !!isVault.data };
-}
-
+/** Unwrap to an address or pay a Vault: instant within the budget, else a Queued request (1 USDC bond). */
 export function SendCard({ v }: { v: VaultView }) {
   const roles = useRoles(v);
-  const [assetAddr, setAssetAddr] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [dest, setDest] = useState("");
-  const [asWeth, setAsWeth] = useState(false);
   const tx = useTx();
-  const s = v.s;
-  const asset = v.assets.find((a) => a.underlying === assetAddr) ?? v.assets[0];
-  const amt = asset ? safeParse(amount, asset.decimals) : undefined;
+  const s = v.s!;
+  const amt = safeParse(amount);
   const d = useDestination(dest);
-  const myBal = asset?.balances.find((b) => b.wallet.toLowerCase() === roles.address?.toLowerCase())?.balance ?? 0n;
-
-  const usd = useReadContract({
-    address: v.vault,
-    abi: vaultAbi,
-    functionName: "valueUsd",
-    args: [asset?.underlying as Address, amt ?? 0n],
-    chainId: sepolia.id,
-    query: { enabled: !!asset && !!amt && !!v.vault },
-  });
-  const usdValue = usd.data?.[0];
-  const stale = usd.data?.[1];
-  const instant = usdValue !== undefined && s ? usdValue <= s.availableBudgetUsd && !stale : undefined;
+  const myBal = v.balances.find((b) => eq(b.wallet, roles.address))?.balance ?? 0n;
+  const instant = !!amt && amt <= s.availableBudget;
+  const need = amt ? (instant ? amt : amt + BOND) : 0n;
+  const self = eq(d.address, v.vault);
 
   async function go() {
-    if (!v.vault || !asset || !amt || !d.address) return;
-    if (instant) {
-      await tx.send(
-        { address: v.vault, abi: vaultAbi, functionName: "unwrap", args: [asset.underlying, amt, d.address, asWeth] },
-        d.isVault ? "Network transfer" : "Unwrap",
-      );
-    } else {
-      await tx.send(
-        { address: v.vault, abi: vaultAbi, functionName: "requestUnwrap", args: [asset.underlying, amt, d.address, asWeth], value: BOND_WEI },
-        "Queued request",
-      );
-    }
+    if (!v.vault || !amt || !d.address) return;
+    const fn = instant ? (d.isVault ? "pay" : "unwrap") : d.isVault ? "requestPayment" : "requestUnwrap";
+    const args = d.isVault ? [d.address, amt] : [amt, d.address];
+    if (await tx.send({ address: v.vault, abi: vaultAbi, functionName: fn, args }, instant ? (d.isVault ? "Pay Vault" : "Unwrap") : "Queue request")) setAmount("");
   }
 
   return (
-    <Card title="Unwrap / send">
-      {!roles.isHot && <Notice tone="amber">Connect one of this Vault&apos;s Hot wallets to spend.</Notice>}
+    <Card title="Send">
+      {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to spend.</Notice>}
       <div className="mt-2 flex flex-col gap-3">
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <Field label="Amount" hint={asset ? `This Hot wallet holds ${fmtAmount(myBal, asset.decimals)} ${asset.symbol}` : undefined}>
-            <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
-          </Field>
-          <Field label="Asset">
-            <Select value={asset?.underlying ?? ""} onChange={(e) => setAssetAddr(e.target.value)}>
-              {v.assets.map((a) => (
-                <option key={a.underlying} value={a.underlying}>
-                  {assetLabel(a)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <Field label="Destination" hint={d.name ? (d.resolving ? "Resolving…" : d.address ? <>→ <Mono>{d.address}</Mono></> : "Name doesn't resolve") : "Address or name"}>
-          <Input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="0x… or bob" />
+        <Field label="Amount (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
+          <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
-        {isWeth(asset?.underlying) && !d.isVault && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={asWeth} onChange={(e) => setAsWeth(e.target.checked)} /> Receive WETH instead of native ETH
-          </label>
-        )}
-        {usdValue !== undefined && (
+        <Field
+          label="Destination"
+          hint={
+            d.name ? (d.resolving ? "Resolving…" : d.address ? <>→ Vault <Mono>{d.address}</Mono></> : "No Vault under that name") : d.isVault ? "palmfi Vault: paid in its own token" : "Address or Vault name"
+          }
+        >
+          <Input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="0x… or palantir" />
+        </Field>
+        {amt && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="tabular">≈ {formatUsd(usdValue)}</span>
-            {stale ? (
-              <Badge tone="red">price stale</Badge>
-            ) : instant ? (
-              <Badge tone="green">{d.isVault ? "instant Network transfer" : "instant lane"}</Badge>
-            ) : (
-              <Badge tone="amber">Queued request: 0.001 ETH bond</Badge>
-            )}
-            {!instant && s && usdValue > s.hardCap && !s.institution && <span className="text-xs text-[var(--subtle)]">above Hard cap: needs Face ID</span>}
+            <span className="tabular">{formatUsd(amt)}</span>
+            {instant ? <Badge tone="green">instant</Badge> : <Badge tone="amber">Queued request · 1 USDC bond</Badge>}
+            {amt > s.hardCap && <span className="text-xs text-[var(--subtle)]">above the Hard cap: at least {Math.round(s.capDelay / 3600)}h unless a majority fast-tracks</span>}
           </div>
         )}
-        <Button onClick={go} disabled={!roles.isHot || !amt || !d.address || tx.busy || usdValue === undefined}>
-          {instant ? (d.isVault ? "Send Network transfer" : "Unwrap now") : "Create Queued request"}
+        <Button onClick={go} disabled={!roles.isWallet || !amt || !d.address || self || myBal < need || tx.busy}>
+          {amt && myBal < need ? `Not enough ${v.symbol} in this wallet` : instant ? (d.isVault ? "Pay now" : "Unwrap now") : "Queue request"}
         </Button>
         <TxStatus state={tx.state} />
       </div>
