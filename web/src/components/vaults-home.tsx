@@ -32,26 +32,31 @@ export function VaultsHome() {
           </Link>
         }
       />
-      <Card label="Open a vault" title="Jump to any vault by name">
-        <form
-          className="flex flex-col gap-2 sm:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (q.trim()) router.push(`/vault/${encodeURIComponent(q.trim().toLowerCase())}`);
-          }}
-        >
-          <input
-            className="pf-input flex-1"
-            placeholder="northwind or 0x…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Vault name or address"
-          />
-          <button className="pf-btn dark" type="submit" disabled={!q.trim()}>
-            Open
-          </button>
-        </form>
-      </Card>
+      {my.mine.length === 0 && (
+        <Card label="Open a vault" title="Jump to any vault by name">
+          <form
+            className="flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (q.trim())
+                router.push(
+                  `/vault/${encodeURIComponent(q.trim().toLowerCase())}`,
+                );
+            }}
+          >
+            <input
+              className="pf-input flex-1"
+              placeholder="northwind or 0x…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Vault name or address"
+            />
+            <button className="pf-btn dark" type="submit" disabled={!q.trim()}>
+              Open
+            </button>
+          </form>
+        </Card>
+      )}
       <WalletGate title="Connect to see your vaults">
         {my.isLoading ? (
           <div className="pf-grid3">
@@ -63,7 +68,8 @@ export function VaultsHome() {
           <Card>
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="max-w-[52ch] text-[15px] text-[var(--ink-2)]">
-                This wallet isn&apos;t a voter in any vault yet. Create one, or ask your team to propose adding it.
+                This wallet isn&apos;t a voter in any vault yet. Create one, or
+                ask your team to propose adding it.
               </p>
               <Link className="pf-btn line" href="/directory">
                 Browse the directory
@@ -88,10 +94,14 @@ export function VaultsHome() {
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <span className="pf-serif text-[34px] leading-none tracking-tight">{m.name ?? "vault"}</span>
+                  <span className="pf-serif text-[34px] leading-none tracking-tight">
+                    {m.name ?? "vault"}
+                  </span>
                   <AddressChip address={m.vault} explorer={false} />
                 </div>
-                <span className="pf-mono pf-dim transition-colors group-hover:text-[var(--ink)]">Open dashboard →</span>
+                <span className="pf-mono pf-dim transition-colors group-hover:text-[var(--ink)]">
+                  Open dashboard →
+                </span>
               </Link>
             ))}
           </div>

@@ -48,6 +48,11 @@ export function VaultHeader({ v }: { v: VaultView }) {
           <Link href={`/o/${v.name ?? v.vault}`} className="pf-btn line">
             Public page
           </Link>
+          {(roles.isWallet || roles.isRecovery) && (
+            <Link href="/onboard" className="pf-btn line">
+              Create a vault
+            </Link>
+          )}
           {roles.isWallet && (
             <Link href={`/vault/${v.name ?? v.vault}?action=send`} className="pf-btn dark">
               Send or pay
