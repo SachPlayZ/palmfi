@@ -213,4 +213,77 @@ contract OrbitalTest is NetworkTest {
     function _assertBacked(Vault v) internal view {
         assertGe(usdcBalance(address(v)), tokenOf(v).totalSupply(), "reserves >= supply");
     }
+
+    // --- Ticks: depeg bound protecting the issuer's own LP ---
+
+    function test_tick_boundsForeignInventory() public {
+        vm.prank(w[0]);
+        hook.setTick(nt, 9_500); // Nvidia: won't accept a token worth < 95% of its own
+        // Dump palantir into nvidia until the tick breaches; accepted input is bounded.
+        uint256 lo;
+        uint256 hi = 9_000e6;
+        vm.expectRevert(abi.encodeWithSelector(OrbitalHook.TickBreached.selector, pt, nt));
+        hook.quote(pt, nt, hi, true);
+        while (hi - lo > 1e6) {
+            uint256 mid = (lo + hi) / 2;
+            try hook.quote(pt, nt, mid, true) {
+                lo = mid;
+            } catch {
+                hi = mid;
+            }
+        }
+        // Without the tick the same pool would take (almost) all of nvidia's reserve for palantir; with it the
+        // foreign inventory is capped well below nvidia's 10k LP.
+        assertLt(lo, 7_200e6); // measured ≈7.09k at a 95% floor (20× concentration)
+        assertGt(lo, 0);
+        // A tighter tick bounds exposure harder.
+        vm.prank(w[0]);
+        hook.setTick(nt, 9_900);
+        vm.expectRevert(abi.encodeWithSelector(OrbitalHook.TickBreached.selector, pt, nt));
+        hook.quote(pt, nt, lo, true);
+        // Other direction (nvidia into palantir) is unaffected by nvidia's tick.
+        hook.quote(nt, pt, 1_000e6, true);
+    }
+
+    function test_tick_onlyOwnWalletAndRange() public {
+        vm.prank(p[0]);
+        vm.expectRevert(OrbitalHook.NotWallet.selector);
+        hook.setTick(nt, 9_000);
+        vm.startPrank(w[0]);
+        vm.expectRevert(OrbitalHook.BadTick.selector);
+        hook.setTick(nt, 100);
+        vm.expectRevert(OrbitalHook.BadTick.selector);
+        hook.setTick(nt, 10_000);
+        hook.setTick(nt, 9_000);
+        hook.setTick(nt, 0); // loosening is the issuer's own choice
+        vm.stopPrank();
+    }
+
+    function test_tick_swapWithinBoundStillWorks_frozenIssuerCappedExposure() public {
+        vm.prank(w[0]);
+        hook.setTick(nt, 9_500);
+        uint256 paid = _pay(p[0], palantir, nvidia, nvidia.wallets()[1], 100e6);
+        assertGt(paid, 0);
+        // Palantir gets frozen: its token stops trading; nvidia's inventory of pUSDC stays at what was swapped in.
+        uint256 held = hook.reserveOf(pt) - hook.liquidityOf(pt);
+        vm.prank(p[1]);
+        palantir.freeze();
+        vm.expectRevert(abi.encodeWithSelector(OrbitalHook.FrozenToken.selector, pt));
+        hook.quote(pt, nt, 1e6, true);
+        assertEq(hook.reserveOf(pt) - hook.liquidityOf(pt), held);
+        assertLe(held, 7_200e6); // bounded by the tick
+    }
+
+    function testFuzz_tick_priceNeverBelowFloor(uint96 amt, uint16 floorBps) public {
+        uint256 floor = bound(floorBps, 5_000, 9_999);
+        vm.prank(w[0]);
+        hook.setTick(nt, floor);
+        uint256 a = bound(amt, 1e6, 9_500e6);
+        try hook.quote(pt, nt, a, true) returns (uint256 inn, uint256 out) {
+            uint256 r = hook.radius();
+            uint256 ai = r - (hook.reserveOf(pt) + hook.virtualOffset()) - inn;
+            uint256 aj = r - (hook.reserveOf(nt) + hook.virtualOffset()) + out;
+            assertGe(ai * 10_000, aj * floor);
+        } catch {}
+    }
 }

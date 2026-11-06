@@ -61,7 +61,7 @@ Every Voter gets a Telegram alert on long delays, FLAGs and settings changes, so
 |---|---|---|
 | **Arc** | USDC-only treasury vaults; USDC gas; only the 6-decimal ERC-20 view of USDC is used (native `msg.value` is rejected); deployed and exercised live on Arc testnet; built, tested and audited in **Arc Studio** | [`contracts/src/Vault.sol`](contracts/src/Vault.sol), [`config/arc.json`](config/arc.json), [`docs/audits/`](docs/audits) |
 | **Chainlink CRE** | Deterministic deviation scoring (milli-bit fixed point, no floats) to `SET_DELAY` / `FLAG` reports; log-triggered Sentinel, cron Reconciler (heartbeat, reserves, EIP-7702 delegation checks, catch-up scoring); Confidential HTTP notifications; failure-matrix simulation fixtures | [`cre/shared/deviation.ts`](cre/shared/deviation.ts), [`cre/sentinel/main.ts`](cre/sentinel/main.ts), [`cre/reconciler/main.ts`](cre/reconciler/main.ts), [`contracts/src/Hub.sol`](contracts/src/Hub.sol) (`onReport`) |
-| **Uniswap v4** | N-token **Orbital** pool as one hook: every 2-token `PoolKey` is a facade over shared reserves held as ERC-6909 claims; `beforeSwap` NoOp custom curve with closed-form sphere trades; a payer's swap-in is charged to their Vault's budget; frozen tokens halt; deferred USDC settlement between issuers; own minimal router as trusted `msgSender()` | [`contracts/src/orbital/`](contracts/src/orbital), [`FEEDBACK.md`](FEEDBACK.md) |
+| **Uniswap v4** | N-token **Orbital** pool as one hook: every 2-token `PoolKey` is a facade over shared reserves held as ERC-6909 claims; `beforeSwap` NoOp custom curve with closed-form sphere trades; a payer's swap-in is charged to their Vault's budget; frozen tokens halt; deferred USDC settlement between issuers; own minimal router as trusted `msgSender()` | [`contracts/src/orbital/`](contracts/src/orbital) — [`registerToken`](contracts/src/orbital/OrbitalHook.sol#L122) (pair facades), [`_beforeSwap`](contracts/src/orbital/OrbitalHook.sol#L286) (NoOp curve + payer charge), [`quote`](contracts/src/orbital/OrbitalHook.sol#L262), [`setTick`](contracts/src/orbital/OrbitalHook.sol#L195), [`settle`](contracts/src/orbital/OrbitalHook.sol#L204), [`OrbitalMath`](contracts/src/orbital/OrbitalMath.sol); [`FEEDBACK.md`](FEEDBACK.md) |
 
 ## Deployed (Arc testnet, chain 5042002)
 
@@ -127,7 +127,7 @@ Open http://localhost:3000, connect a wallet on Arc testnet, onboard an org with
 
 ## Tests
 
-- Contracts: 66 Foundry tests on an Arc fork (lanes, votes, changes, whitelist, Orbital swaps / settlement / fuzz, audit regressions); every contract under 24 KB.
+- Contracts: 70 Foundry tests on an Arc fork (lanes, votes, changes, whitelist, Orbital swaps / settlement / fuzz, audit regressions); every contract under 24 KB.
 - CRE: 124 tests (deviation model calibration, scoring outcomes, Sentinel and Reconciler handlers, the brief's §7.4 failure matrix).
 - Web: 26 tests (helpers, notify fan-out, Telegram linking, a drift test that keeps the UI's copy of the scoring model identical to the Sentinel's).
 
@@ -135,5 +135,5 @@ Open http://localhost:3000, connect a wallet on Arc testnet, onboard an org with
 
 - The testnet Hub trusts CRE's **simulation forwarder** so the demo can run through `cre workflow simulate --broadcast`; anyone can forge reports to it. Production pins the Keystone forwarder and the workflow identity (`Hub.pinWorkflow`).
 - Veto needs a majority of the non-requester wallets: an offline honest wallet counts against the veto. Alerts to every Voter exist to keep them present.
-- The Orbital pool ships the single-sphere step of the design (virtual reserves, concentration 20). Nested ticks are not built yet.
+- The Orbital pool ships the single-sphere step of the design (virtual reserves, concentration 20) plus a per-token **depeg bound** (`setTick`): a price floor that caps how much of a depegged token the pool will accumulate. Paradigm's full nested-cap / torus ticks (ADR-0010's top rung) are not built; the bound is the fallback that gives the same bounded-exposure guarantee. The hook change is tested but the Arc deployment predates it (redeploy needed).
 - Passkey voters for Individuals are deferred.

@@ -65,12 +65,19 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     uint256 public virtualOffset;
     uint256 public radius;
 
+    /// Tick (depeg bound), set by each token's issuer for its own LP: the lowest price, in bps of the peg, at which
+    /// the pool will still accept another token in exchange for this one. 0 = no bound. A dumped (depegging) token
+    /// can therefore only accumulate until its marginal price hits the bound, which caps the issuer LP's exposure.
+    mapping(address => uint256) public tickFloorBps;
+    uint256 internal constant BPS = 10_000;
+
     bool transient _initializing;
 
     event TokenRegistered(address indexed token, address indexed vault, uint256 index);
     event LiquidityAdded(address indexed token, address indexed wallet, uint256 amount);
     event LiquidityRemoved(address indexed token, address indexed wallet, uint256 amount);
     event OrbitalSwap(address indexed tokenIn, address indexed tokenOut, address payer, uint256 amountIn, uint256 amountOut);
+    event TickSet(address indexed token, uint256 floorBps);
     event Settled(address indexed fromToken, address indexed toToken, uint256 amount);
 
     error OnlyFactory();
@@ -85,6 +92,8 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     error TooManyTokens();
     error PoolNotAllowed();
     error LiquidityNotAllowed();
+    error TickBreached(address tokenIn, address tokenOut);
+    error BadTick();
 
     constructor(IPoolManager pm, address factory_, address admin_) BaseHook(pm) {
         factory = factory_;
@@ -181,6 +190,15 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         emit LiquidityRemoved(token, msg.sender, amount);
     }
 
+    /// An org sets the depeg bound protecting its own LP: the pool refuses trades that would push the marginal
+    /// price of an incoming token below `floorBps`/10000 of this token. Must be 0 or in [5000, 10000).
+    function setTick(address token, uint256 floorBps) external {
+        if (!IOrbitalVault(_vault(token)).isWallet(msg.sender)) revert NotWallet();
+        if (floorBps != 0 && (floorBps < 5000 || floorBps >= BPS)) revert BadTick();
+        tickFloorBps[token] = floorBps;
+        emit TickSet(token, floorBps);
+    }
+
     /// Deferred burn-and-mint: move every token's excess (held beyond what its issuer provided) to the tokens
     /// that are short, issuer Vault → receiving Vault in USDC. Anyone may call (the Reconciler does each pass).
     function settle() external returns (uint256 moved) {
@@ -257,6 +275,12 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         if (exactIn) (amountIn, amountOut) = (amount, OrbitalMath.outGivenIn(ai, aj, amount));
         else (amountIn, amountOut) = (OrbitalMath.inGivenOut(ai, aj, amount), amount);
         if (amountOut > reserveOf[tokenOut]) revert InsufficientReserve();
+        // Tick: after the trade, the incoming token must still be worth at least the out-token's floor.
+        uint256 floorBps = tickFloorBps[tokenOut];
+        if (floorBps != 0) {
+            // marginal price of tokenIn in tokenOut after the trade = (ai − in) / (aj + out)
+            if ((ai - amountIn) * BPS < (aj + amountOut) * floorBps) revert TickBreached(tokenIn, tokenOut);
+        }
     }
 
     function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
