@@ -50,6 +50,8 @@ interface IResolverInit {
 
 interface IEthRegistry {
     function setSubregistry(uint256 anyId, address registry) external;
+    function getResource(uint256 anyId) external view returns (uint256);
+    function hasRoles(uint256 resource, uint256 roleBitmap, address account) external view returns (bool);
 }
 
 /// Single deploy path shared by the Sepolia deploy script and the fork test base,
@@ -60,6 +62,7 @@ abstract contract NetworkDeployer {
     uint256 internal constant ENS_ALL_ROLES = 0x1111111111111111111111111111111111111111111111111111111111111111;
     uint256 internal constant REG_ROLE_REGISTRAR = 1 << 0;
     uint256 internal constant REG_ROLE_UNREGISTER = 1 << 12;
+    uint256 internal constant REG_ROLE_SET_SUBREGISTRY = 1 << 20;
     uint256 internal constant RES_ROLE_SET_ADDRESS = 1 << 0;
 
     function deployNetwork(External memory e, address deployer) internal returns (Deployment memory d) {
@@ -78,9 +81,12 @@ abstract contract NetworkDeployer {
             );
         // Needs ROLE_SET_SUBREGISTRY on palmfi.eth (the parent owner, or a deployer it granted). Without it the
         // network still deploys; the owner then attaches names with one setSubregistry(palmfi, ensUserRegistry).
-        try IEthRegistry(e.ensEthRegistry).setSubregistry(uint256(keccak256(bytes(PARENT_LABEL))), d.ensUserRegistry) {
+        uint256 parentId = uint256(keccak256(bytes(PARENT_LABEL)));
+        IEthRegistry ethReg = IEthRegistry(e.ensEthRegistry);
+        if (ethReg.hasRoles(ethReg.getResource(parentId), REG_ROLE_SET_SUBREGISTRY, deployer)) {
+            ethReg.setSubregistry(parentId, d.ensUserRegistry);
             d.ensAttached = true;
-        } catch {}
+        }
 
         // --- network ---
         Hub hub = new Hub(deployer, e.creSimForwarder, d.ensResolver);
