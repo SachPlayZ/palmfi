@@ -252,7 +252,7 @@ function Nav() {
         <a href="#lanes">Lanes</a>
         <a href="#try">Try it</a>
         <a href="#sentinel">Sentinel</a>
-        <a href="#network">Network</a>
+        <a href="#network">Orbital pool</a>
         <a href="#pieces">Protocol</a>
       </nav>
       <Link href="/onboard" className="m-pill">
@@ -280,9 +280,9 @@ const ly = (i: number) => r2(70 + i * (360 / (NL - 1)));
 const LANE_OF = (i: number) => (i < 4 ? 0 : i < 11 ? 1 : i < 14 ? 2 : 3);
 const LANE_COL = ["#3f7d3a", "#cdb935", "#1d3a2a", "#8dbd6b"];
 const LANE_LBL = [
-  { t: "INSTANT · $500 / 24H", x: 960, y: 92, a: "end" },
-  { t: "QUEUED · SENTINEL SCORES IT", x: 770, y: 318, a: "middle" },
-  { t: "PASSKEY ABOVE $5K", x: 762, y: 382, a: "middle" },
+  { t: "INSTANT BUDGET · 24H / 7D", x: 960, y: 92, a: "end" },
+  { t: "QUEUED · DELAY GROWS WITH SURPRISE", x: 770, y: 318, a: "middle" },
+  { t: "YOUR WALLETS VOTE", x: 762, y: 382, a: "middle" },
   { t: "RECOVERY VAULT · FIXED AT ONBOARDING", x: 960, y: 470, a: "end" },
 ] as const;
 
@@ -306,7 +306,7 @@ const CAPS = [
   { k: "The drain", t: "One valid signature. One transaction. $2.5B gone." },
   { k: "The gate", t: "A palmfi vault puts a gate where a signature can't reach." },
   { k: "The lanes", t: "Past the gate, every payment takes a lane." },
-  { k: "The brake", t: "A stolen key still works. It moves $500 today. The rest waits." },
+  { k: "The brake", t: "A stolen key only buys the budget. The rest waits for your team." },
 ];
 
 function Hero() {
@@ -387,17 +387,17 @@ function Statement() {
   return (
     <section className="m-state">
       <div data-r>
-        <span className="mono dim">(000) palmfi — protected vaults on Ethereum</span>
+        <span className="mono dim">(000) palmfi — protected USDC vaults on Arc</span>
         <h1 className="m-h1 serif">
           <Words text="Your keys can be stolen." />
           <em>
-            <Words text="Your money can't leave" base={0.25} />
+            <Words text="Your treasury can't leave" base={0.25} />
           </em>{" "}
-          <Words text="faster than you can say no." base={0.5} />
+          <Words text="faster than your team can say no." base={0.5} />
         </h1>
       </div>
       <div className="m-state-row" data-r style={{ "--d": "0.5s" } as CSSProperties}>
-        <p>Deposit USDC or ETH, receive your own protected token, and know that a stolen key or a hijacked signing system can only move what you&rsquo;d tolerate losing on a bad day.</p>
+        <p>Every organisation gets its own USDC vault and Protected token. Small payments go out instantly within a budget. Anything larger waits as long as it is unusual, and a majority of your own wallets can veto it.</p>
         <div className="m-ctas">
           <Link href="/onboard" className="m-btn dark">
             <Mark /> Open a vault
@@ -413,7 +413,7 @@ function Statement() {
 
 /* ───────────────────────── logo strip ───────────────────────── */
 
-const BUILT = ["Chainlink CRE", "Uniswap v4", "ENS", "Ethereum", "Circle USDC", "Passkeys · P-256", "Data Feeds", "EIP-7951"];
+const BUILT = ["Arc", "Chainlink CRE", "Uniswap v4", "Circle USDC", "Orbital pool", "EIP-7702 checks", "Arc Studio", "Telegram alerts"];
 
 function Strip() {
   return (
@@ -537,10 +537,10 @@ const DECK: {
     bg: "#fbfaf4",
     fg: "#1f2a1e",
     ink: "#2f6b3a",
-    card: "Pay any allowed address within your rolling 24h and 7d budgets. No CRE in the path.",
+    card: "Pay any address within your rolling 24h and 7d budget. Nothing waits.",
     title: "Small spending, no one in the way.",
-    body: "Everyday payments go straight out, measured in USD with Chainlink Data Feeds and shared across USDC and WETH. They keep working even if Chainlink is down.",
-    meta: "$500 / 24h · $2,000 / 7d",
+    body: "Everyday unwraps and pay-by-name payments go straight out, charged to one Instant budget that refills gradually over 24 hours and 7 days.",
+    meta: "rolling 24h · 7d budget",
   },
   {
     k: "Queued lane",
@@ -548,21 +548,21 @@ const DECK: {
     bg: "#e9d95c",
     fg: "#1f2a1e",
     ink: "#1f2a1e",
-    card: "Above budget, a request waits for the Sentinel. CLEAR shortens the wait, never to zero.",
-    title: "Big payouts wait for a second look.",
-    body: "The Sentinel scores every queued request CLEAR, HOLD or FLAG. A CLEAR only shortens the delay to a 15-minute floor. A FLAG freezes the vault on the spot.",
-    meta: "floor 15 min · full delay 24h",
+    card: "Above budget, a payment waits. The more unusual it is, the longer it waits.",
+    title: "Unusual payouts wait longer.",
+    body: "The Sentinel scores each queued request in bits of surprise against that wallet's and that vault's own history. The delay doubles every 2.5 bits from a 15-minute floor, so routine payroll waits about half an hour.",
+    meta: "floor 15 min · 72h until scored",
   },
   {
-    k: "Second factor",
+    k: "Your team",
     g: "ladder",
     bg: "#1d3a2a",
     fg: "#e8f2c8",
     ink: "#cfe86a",
-    card: "Above the hard cap, a phone passkey or an approver key must sign too. Verified onchain.",
-    title: "A key your laptop doesn't hold.",
-    body: "Individuals confirm with a phone passkey checked by the P-256 precompile. Institutions confirm with approver keys kept apart from their hot wallets, so one compromise can't own both.",
-    meta: "EIP-7951 · P256VERIFY at 0x100",
+    card: "While it waits, a majority of your own wallets can veto it or fast-track it.",
+    title: "Your team can say no.",
+    body: "More than half of the other wallets voting NO cancels the request. More than half of all wallets voting YES makes it executable at the floor. Every Voter gets a Telegram alert, so honest wallets are there to vote.",
+    meta: "3+ wallets · one vote each",
   },
   {
     k: "Recovery",
@@ -570,9 +570,9 @@ const DECK: {
     bg: "#8dbd6b",
     fg: "#fbfdf3",
     ink: "#fbfdf3",
-    card: "One cold key can migrate everything to the recovery vault fixed at onboarding.",
+    card: "Any one wallet can freeze the vault. Frozen funds can only go to the recovery vault.",
     title: "Rescue goes to one place, set in advance.",
-    body: "No one can redirect funds mid-incident, not even voters. The factory deploys a fresh vault and re-points your ENS name. Changing the recovery address itself takes seven days.",
+    body: "A frozen vault stops every outflow except migration to the recovery vault fixed at onboarding. Changing that address takes seven days, so no one can redirect funds mid-incident.",
     meta: "recovery change · 7-day timelock",
   },
 ];
@@ -656,20 +656,29 @@ function Deck() {
 
 const BUDGET = 500;
 const CAP = 5000;
+const FLOOR = 15;
 const STEPS = ["Signed", "Budget", "Sentinel", "Funds"];
+
+/** Illustrative surprise score: grows with how far past the budget the amount is. */
+const bitsFor = (amt: number) => 3 + 2.2 * Math.log2(amt / BUDGET + 1);
+const fmtMin = (m: number) => (m < 60 ? `${Math.round(m)} min` : m < 48 * 60 ? `${Math.round(m / 60)} h` : `${Math.round(m / 1440)} days`);
 
 function Try() {
   const [amt, setAmt] = useState(320);
   const [attack, setAttack] = useState(false);
-  const [passkey, setPasskey] = useState(true);
+  const [fast, setFast] = useState(false);
   const lane = attack ? "flag" : amt <= BUDGET ? "instant" : amt <= CAP ? "queued" : "cap";
+  const bits = bitsFor(amt);
+  const delay = FLOOR * Math.pow(2, bits / 2.5);
+  const queued = (min: number, note: string) =>
+    fast
+      ? { v: "FAST-TRACKED", t: `${FLOOR} min`, note: "More than half of your wallets voted YES, so it can execute at the floor.", reach: 4, skip: [] as number[] }
+      : { v: `${bits.toFixed(1)} BITS`, t: fmtMin(min), note, reach: 4, skip: [] as number[] };
   const out = {
-    instant: { v: "PAID", t: "now", note: "Inside your instant budget. No one is asked, nothing waits.", reach: 4, skip: [2] },
-    queued: { v: "CLEAR", t: "15 min", note: "Queued. The Sentinel scores it CLEAR, and the 15-minute floor runs out.", reach: 4, skip: [] as number[] },
-    cap: passkey
-      ? { v: "CLEAR + PASSKEY", t: "15 min", note: "Above the $5,000 hard cap. Your phone passkey co-signed, so the floor applies.", reach: 4, skip: [] as number[] }
-      : { v: "CLEAR, NO PASSKEY", t: "24 h", note: "Above the hard cap with no second factor: the full 24-hour delay applies.", reach: 4, skip: [] as number[] },
-    flag: { v: "FLAG", t: "never", note: "Unknown 7702 delegate signing. The vault freezes; funds wait for your recovery key.", reach: 3, skip: [] as number[] },
+    instant: { v: "PAID", t: "now", note: "Inside your Instant budget. No one is asked, nothing waits.", reach: 4, skip: [2] },
+    queued: queued(delay, "Queued with a 1 USDC bond. The delay doubles every 2.5 bits of surprise from the 15-minute floor, and your wallets can veto it meanwhile."),
+    cap: queued(Math.max(delay, 24 * 60), "Above the $5,000 hard cap: at least 24 hours, unless a majority of your wallets fast-tracks it."),
+    flag: { v: "FLAG", t: "never", note: "A fresh 7702 delegate sending to a new address scores past 28 bits. The vault freezes and the destination is blocklisted.", reach: 3, skip: [] as number[] },
   }[lane];
   const used = Math.min(amt, BUDGET) / BUDGET;
   return (
@@ -705,8 +714,8 @@ function Try() {
             <button className={`m-tog ${attack ? "on danger" : ""}`} onClick={() => setAttack((a) => !a)} aria-pressed={attack}>
               <i /> Signer is compromised
             </button>
-            <button className={`m-tog ${passkey ? "on" : ""}`} onClick={() => setPasskey((a) => !a)} aria-pressed={passkey} disabled={lane !== "cap"}>
-              <i /> Phone passkey signs
+            <button className={`m-tog ${fast ? "on" : ""}`} onClick={() => setFast((a) => !a)} aria-pressed={fast} disabled={lane === "instant" || lane === "flag"}>
+              <i /> Team fast-tracks it
             </button>
           </div>
           <div className="m-ring-row">
@@ -717,12 +726,12 @@ function Try() {
             <div>
               <span className="mono dim">Instant budget left today</span>
               <b className="serif tabular">${Math.max(0, BUDGET - Math.min(amt, BUDGET)).toLocaleString("en-US")}</b>
-              <span className="mono dim">refills over 24h · shared across USDC + WETH</span>
+              <span className="mono dim">refills gradually over 24h and 7d</span>
             </div>
           </div>
         </div>
         <div className={`m-try-out lane-${lane}`}>
-          <div className="m-track" key={lane + passkey}>
+          <div className="m-track" key={lane + fast}>
             {STEPS.map((s, j) => (
               <div key={s} className={`m-step ${j < out.reach ? "hit" : ""} ${out.skip.includes(j) ? "skip" : ""}`} style={{ "--d": `${j * 0.3}s` } as CSSProperties}>
                 <i />
@@ -732,7 +741,7 @@ function Try() {
             <span className="m-runner" style={{ "--to": `${((out.reach - 1) / (STEPS.length - 1)) * 100}%` } as CSSProperties} />
           </div>
           <div className="m-verdict">
-            <span className="mono dim">Verdict</span>
+            <span className="mono dim">Verdict · illustrative</span>
             <b key={out.v}>{out.v}</b>
           </div>
           <div className="m-verdict">
@@ -753,16 +762,16 @@ function Try() {
 const LABELS = [
   { t: "NEW_DESTINATION", a: -2.45, r: 196 },
   { t: "DELEGATION_CHANGED", a: -2.9, r: 210 },
-  { t: "BLOCKLISTED", a: 2.75, r: 190 },
-  { t: "VELOCITY", a: -0.95, r: 205 },
-  { t: "LOOSENING_PENDING", a: -0.25, r: 215 },
-  { t: "STALE_FEED", a: 0.55, r: 180 },
+  { t: "BLOCKLISTED_DEST", a: 2.75, r: 190 },
+  { t: "UNUSUAL_AMOUNT", a: -0.95, r: 205 },
+  { t: "CONFIG_CHANGE_PENDING", a: -0.25, r: 215 },
+  { t: "OFF_HOURS", a: 0.55, r: 180 },
 ];
 const REQS = [
-  { r: "unwrap 420 USDC → allowlisted", v: "CLEAR" },
-  { r: "unwrap 9,800 USDC → new address", v: "HOLD" },
-  { r: "7702 delegate → unknown sweeper", v: "FLAG" },
-  { r: "hook swap 0.4 WETH → USDC", v: "CLEAR" },
+  { r: "payroll 4,200 USDC → usual address", v: "3 BITS · 30 MIN", c: "CLEAR" },
+  { r: "45,000 USDC at 3am → new address", v: "15 BITS · 1 H", c: "HOLD" },
+  { r: "7702 delegate → unknown sweeper", v: "FLAG", c: "FLAG" },
+  { r: "vendor 900 USDC → known address", v: "4 BITS · 45 MIN", c: "CLEAR" },
 ];
 
 function Sentinel() {
@@ -791,7 +800,7 @@ function Sentinel() {
           <div className="m-sent-caption">
             <span className="mono">(004) Sentinel</span>
             <h2 className="serif">Every request, scored before it leaves.</h2>
-            <p>One shared Chainlink CRE workflow watches the Hub for every vault. When unsure, it holds. When it sees an attacker, it freezes in seconds, and one victim&rsquo;s attacker lands on everyone&rsquo;s blocklist.</p>
+            <p>One shared Chainlink CRE workflow scores every outflow against that wallet&rsquo;s and that vault&rsquo;s own history, with pure integer math. The more surprising a request, the longer it waits. Past the threshold it flags: the vault freezes and the destination lands on the shared blocklist.</p>
           </div>
           <i className="m-grain" />
         </div>
@@ -826,20 +835,20 @@ function Sentinel() {
                 );
               })}
             </g>
-            <circle cx="260" cy="240" r="7" className={`core v-${q.v}`} />
-            <circle cx="260" cy="240" r="7" className={`pulse v-${q.v}`} key={n} />
+            <circle cx="260" cy="240" r="7" className={`core v-${q.c}`} />
+            <circle cx="260" cy="240" r="7" className={`pulse v-${q.c}`} key={n} />
           </svg>
           <div className="m-sent-legend mono">
             <span>
-              <i className="tech" /> Onchain signals
+              <i className="tech" /> Wallet signals
             </span>
             <span>
-              <i className="eco" /> Network signals
+              <i className="eco" /> Vault signals
             </span>
           </div>
           <div className="m-sent-feed mono" key={n}>
             <span className="dim">{q.r}</span>
-            <b className={`v-${q.v}`}>{q.v}</b>
+            <b className={`v-${q.c}`}>{q.v}</b>
           </div>
         </div>
       </div>
@@ -849,13 +858,14 @@ function Sentinel() {
 
 /* ───────────────────────── asymmetry ───────────────────────── */
 
-const TIGHT = ["Lower the budget", "Lengthen the delay", "Remove a destination", "Pause the vault", "Blocklist an address"];
+const TIGHT = ["Remove a wallet", "Freeze the vault", "Migrate to the recovery vault"];
 const LOOSE = [
+  { t: "Add a wallet", h: 48 },
   { t: "Raise the budget", h: 48 },
+  { t: "Loosen limits or delays", h: 48 },
   { t: "Add a destination", h: 48 },
-  { t: "Change guardian", h: 168 },
-  { t: "Change recovery", h: 168 },
-  { t: "Change approver keys", h: 168 },
+  { t: "Change recovery vault", h: 168 },
+  { t: "Change recovery key", h: 168 },
 ];
 
 function Asymmetry() {
@@ -867,7 +877,7 @@ function Asymmetry() {
           <h2 className="m-h2 serif">
             <Words text="Tighten in a click." /> <em><Words text="Loosen in days." base={0.2} /></em>
           </h2>
-          <p className="m-sec-p">Otherwise an attacker&rsquo;s first move is setting the delay to zero. Any withdrawal requested while a loosening change is pending gets flagged.</p>
+          <p className="m-sec-p">Every settings change is a majority vote of your wallets. Tightening lands now; loosening waits out a timelock, and while it&rsquo;s pending, every payment looks more unusual to the Sentinel.</p>
         </div>
       </div>
       <div className="m-asym-grid">
@@ -898,60 +908,59 @@ function Asymmetry() {
 
 /* ───────────────────────── network: shared blocklist orbit ───────────────────────── */
 
-const MEMBERS = ["northwind", "halcyon", "kestrel", "orbital", "meridian", "lumen", "tessera", "quill", "alder", "beacon", "cinder", "marlow"];
+const ORGS = ["northwind", "halcyon", "kestrel", "tessera", "meridian", "lumen", "alder", "quill", "beacon", "cinder", "marlow", "orchid"];
 const NODE_BG = ["#fbfaf4", "#e9d95c", "#1d3a2a", "#8dbd6b"];
+const AMOUNTS = [3, 120, 48, 900, 15, 260];
 
+/** Orgs around one Orbital pool: the payer swaps its token in, the payee receives its own token out. */
 function Orbit() {
   const box = useRef<HTMLDivElement>(null);
   const seen = useInView(box, 0.3);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!seen || reduced()) return;
-    const t = setInterval(() => setTick((x) => x + 1), 3400);
+    const t = setInterval(() => setTick((x) => x + 1), 3000);
     return () => clearInterval(t);
   }, [seen]);
-  const src = (tick * 5 + 2) % MEMBERS.length;
+  const from = (tick * 5 + 2) % ORGS.length;
+  const to = (from + 4 + (tick % 5)) % ORGS.length;
   const C = 300;
   const R = 200;
-  const pos = MEMBERS.map((_, i) => {
-    const a = -Math.PI / 2 + (i * 2 * Math.PI) / MEMBERS.length;
+  const pos = ORGS.map((_, i) => {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / ORGS.length;
     return { x: r2(C + Math.cos(a) * R), y: r2(C + Math.sin(a) * R), lx: r2(C + Math.cos(a) * (R + 34)), ly: r2(C + Math.sin(a) * (R + 34)), c: Math.cos(a) };
   });
-  const s = pos[src];
-  const addr = `0x${((tick + 3) * 2654435761 >>> 0).toString(16).slice(0, 4)}…${((tick + 7) * 40503 >>> 0).toString(16).slice(-4)}`;
+  const a = pos[from];
+  const b = pos[to];
   return (
     <div className={`m-orbit ${seen ? "in" : ""}`} ref={box}>
-      <svg viewBox="0 0 600 600" aria-label="Member vaults around the Hub sharing a blocklist">
+      <svg viewBox="0 0 600 600" aria-label="Organisations paying each other through one Orbital pool">
         <circle className="ring" cx={C} cy={C} r={R} />
         <circle className="ring dash" cx={C} cy={C} r={R * 0.52} />
         {pos.map((q, i) => (
           <line key={i} className="spoke" x1={C} y1={C} x2={q.x} y2={q.y} style={{ "--d": `${i * 0.05}s` } as CSSProperties} />
         ))}
         <g className="burst" key={`b${tick}`}>
-          <line className="up" x1={s.x} y1={s.y} x2={C} y2={C} pathLength={1} />
-          {pos.map((q, i) =>
-            i === src ? null : (
-              <line key={i} x1={C} y1={C} x2={q.x} y2={q.y} pathLength={1} style={{ "--d": `${0.45 + ((i - src + MEMBERS.length) % MEMBERS.length) * 0.04}s` } as CSSProperties} />
-            ),
-          )}
+          <line className="in-leg" x1={a.x} y1={a.y} x2={C} y2={C} pathLength={1} />
+          <line className="out-leg" x1={C} y1={C} x2={b.x} y2={b.y} pathLength={1} style={{ "--d": "0.7s" } as CSSProperties} />
         </g>
         {pos.map((q, i) => (
-          <g key={i} className={`node ${i === src ? "src" : ""}`} style={{ "--d": `${0.2 + i * 0.05}s`, transformOrigin: `${q.x}px ${q.y}px` } as CSSProperties}>
+          <g key={i} className={`node ${i === from ? "from" : ""} ${i === to ? "to" : ""}`} style={{ "--d": `${0.2 + i * 0.05}s`, transformOrigin: `${q.x}px ${q.y}px` } as CSSProperties}>
             <rect x={q.x - 11} y={q.y - 14} width="22" height="28" rx="4" fill={NODE_BG[i % 4]} />
-            {i !== src && <circle key={`k${tick}`} className="got" cx={q.x + 11} cy={q.y - 14} r="4" style={{ "--d": `${0.9 + ((i - src + MEMBERS.length) % MEMBERS.length) * 0.04}s` } as CSSProperties} />}
-            {i === src && <circle key={`r${tick}`} className="hit" cx={q.x} cy={q.y} r="18" />}
+            {i === to && <circle key={`k${tick}`} className="got" cx={q.x + 11} cy={q.y - 14} r="4" style={{ "--d": "1.3s" } as CSSProperties} />}
+            {i === from && <circle key={`r${tick}`} className="hit" cx={q.x} cy={q.y} r="18" />}
             <text x={q.lx} y={q.ly + 3} textAnchor={q.c > 0.2 ? "start" : q.c < -0.2 ? "end" : "middle"}>
-              {MEMBERS[i]}
+              {ORGS[i]}
             </text>
           </g>
         ))}
-        <rect className="hub" x={C - 22} y={C - 22} width="44" height="44" rx="10" />
+        <circle className="hub" cx={C} cy={C} r="30" />
         <text className="hub-t" x={C} y={C + 3} textAnchor="middle">
-          HUB
+          ORBITAL
         </text>
       </svg>
       <div className="m-orbit-feed mono" key={tick}>
-        <b>FLAG</b> at {MEMBERS[src]}.palmfi.eth · {addr} added to every member&rsquo;s blocklist
+        <b>{ORGS[from]}</b> pays <b className="to">{ORGS[to]}</b> {AMOUNTS[tick % AMOUNTS.length]} USDC · {ORGS[from]}USDC in, {ORGS[to]}USDC out
       </div>
     </div>
   );
@@ -961,20 +970,20 @@ function Network() {
   return (
     <section className="m-net" id="network">
       <span className="mono m-net-k" data-r>
-        (006) The network
+        (006) Paying other orgs
       </span>
       <Orbit />
       <p className="m-net-q serif" data-r>
-        <Words text="One member's attacker lands on every member's blocklist." />{" "}
+        <Words text="Orgs pay each other by name through one Orbital pool." />{" "}
         <em>
-          <Words text="An incident at one can never freeze another's receivables." base={0.35} />
+          <Words text="You pay in your token, they receive theirs, and it counts against your budget." base={0.35} />
         </em>
       </p>
       <div className="m-net-stats">
         {[
-          { v: <Counter to={15} suffix=" min" />, l: "minimum delay a CLEAR can reach" },
-          { v: <Counter to={72} suffix="h" />, l: "fail-open if CRE is silent (individuals)" },
-          { v: <Counter to={100} suffix="%" />, l: "reserves backing every protected token" },
+          { v: <Counter to={15} suffix=" min" />, l: "the floor: shortest wait for any queued payment" },
+          { v: <Counter to={72} suffix="h" />, l: "default delay until the Sentinel scores a request" },
+          { v: <Counter to={100} suffix="%" />, l: "USDC reserves behind every Protected token" },
         ].map((s, i) => (
           <div key={i} data-r style={{ "--d": `${i * 0.1}s` } as CSSProperties}>
             <i className="m-rule" />
@@ -990,12 +999,12 @@ function Network() {
 /* ───────────────────────── protocol index ───────────────────────── */
 
 const PIECES = [
-  { n: "Vault", k: "Immutable · per owner", d: "Holds the Underlying 1:1, mints your Protected token, enforces every lane, timelock and the 7702 delegation check." },
-  { n: "Hub", k: "One address to watch", d: "Every vault reports through it; every CRE verdict arrives through it. Authenticated, bound, single-use reports." },
-  { n: "Sentinel", k: "Chainlink CRE", d: "Scores unwraps, config changes and swaps: CLEAR, HOLD or FLAG, with onchain reason codes." },
-  { n: "Reconciler", k: "Chainlink CRE · scheduled", d: "Catches missed requests, checks reserves ≥ supply, polls delegations, publishes market modes, writes the heartbeat." },
-  { n: "VaultHook", k: "Uniswap v4", d: "A 1:1 pool per vault, so any Uniswap route can pay into it under the same budget and rules." },
-  { n: "palmfi.eth", k: "ENS names", d: "Non-transferable names for verified vaults, with a live status record. Pay a name, not a hex string." },
+  { n: "Vault", k: "Per org · USDC on Arc", d: "Holds USDC 1:1 behind your Protected token and enforces the budget, the queue, the votes, the freeze and the 7702 delegation check." },
+  { n: "Hub", k: "One address to watch", d: "The name directory, every vault's status, the shared blocklist, and the receiver for every Chainlink CRE report." },
+  { n: "Sentinel", k: "Chainlink CRE", d: "Scores every outflow in bits of surprise and reports a delay or a FLAG, with onchain reason codes." },
+  { n: "Reconciler", k: "Chainlink CRE · scheduled", d: "Writes the heartbeat, scores anything missed, checks reserves and 7702 delegations, and settles pool inventory." },
+  { n: "Orbital pool", k: "Uniswap v4 hook", d: "One N-token pool holding every org's Protected token. A payer's swap-in is charged to its own budget." },
+  { n: "Votes", k: "3+ wallets · one each", d: "Veto, fast-track, freeze and every settings change are decided by a majority of the org's own wallets." },
 ];
 
 function Pieces() {
@@ -1005,7 +1014,7 @@ function Pieces() {
       <div className="m-sec-head" data-r>
         <span className="mono">(007) Protocol</span>
         <h2 className="m-h2 serif">
-          <Words text="Six pieces." /> <em><Words text="No path for an admin to touch your funds." base={0.15} /></em>
+          <Words text="Six pieces." /> <em><Words text="Your team holds every rule." base={0.15} /></em>
         </h2>
       </div>
       <div className="m-pieces-list">
@@ -1040,8 +1049,8 @@ function Footer() {
           <Link href="/onboard" className="m-btn dark">
             <Mark /> Open a vault
           </Link>
-          <Link href="/institution" className="m-btn">
-            For institutions
+          <Link href="/pay" className="m-btn">
+            Pay by name
           </Link>
         </div>
       </div>
@@ -1057,35 +1066,34 @@ function Footer() {
             <Mark />
             <span>palmfi</span>
           </Link>
-          <p>Protected vaults on Ethereum. Built at ETHGlobal Mumbai, November 2026.</p>
+          <p>Protected USDC vaults on Arc. Built at ETHGlobal Mumbai, November 2026.</p>
         </div>
         <div className="m-foot-cols">
           <div>
             <b>App</b>
             <Link href="/onboard">Open a vault</Link>
             <Link href="/vaults">Your vaults</Link>
-            <Link href="/pay">Pay a name</Link>
-            <Link href="/approver">Approver</Link>
+            <Link href="/pay">Pay by name</Link>
           </div>
           <div>
             <b>Protocol</b>
             <a href="#lanes">Exit lanes</a>
             <a href="#sentinel">Sentinel</a>
-            <a href="#network">Network</a>
+            <a href="#network">Orbital pool</a>
             <a href="#pieces">Contracts</a>
           </div>
           <div>
             <b>Built with</b>
+            <span>Arc</span>
             <span>Chainlink CRE</span>
             <span>Uniswap v4</span>
-            <span>ENS</span>
-            <span>Passkeys</span>
+            <span>Circle USDC</span>
           </div>
         </div>
       </div>
       <div className="m-foot-bar">
-        <span>© 2026 palmfi · palmfi.eth</span>
-        <span>Ethereum Sepolia testnet</span>
+        <span>© 2026 palmfi</span>
+        <span>Arc testnet</span>
       </div>
       </div>
     </footer>

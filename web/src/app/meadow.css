@@ -342,18 +342,21 @@
 .m-orbit.in .node { opacity: 1; transform: none; }
 .m-orbit .node rect { stroke: var(--ink); stroke-width: 0.7; }
 .m-orbit .node text { font-family: var(--font-mono-site), monospace; font-size: 10px; letter-spacing: 0.04em; fill: var(--ink-2); }
-.m-orbit .node.src text { fill: var(--red); }
-.m-orbit .hit { fill: none; stroke: var(--red); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: m-ring 1.4s var(--ease) both; }
+.m-orbit .node.from text { fill: #9a8a1c; }
+.m-orbit .node.to text { fill: var(--leaf); }
+.m-orbit .hit { fill: none; stroke: #cdb935; stroke-width: 1.2; transform-box: fill-box; transform-origin: center; animation: m-ring 1.4s var(--ease) both; }
 @keyframes m-ring { from { transform: scale(0.6); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
-.m-orbit .got { fill: var(--red); transform-box: fill-box; transform-origin: center; animation: m-got 2.6s var(--ease) var(--d) both; }
+.m-orbit .got { fill: var(--leaf); transform-box: fill-box; transform-origin: center; animation: m-got 2.6s var(--ease) var(--d) both; }
 @keyframes m-got { 0% { transform: scale(0); } 20%, 80% { transform: scale(1); } 100% { transform: scale(1); opacity: 0.35; } }
-.m-orbit .burst line { stroke: var(--red); stroke-width: 1.1; stroke-dasharray: 1 1; stroke-dashoffset: 1; animation: m-shoot 2.4s var(--ease) var(--d, 0s) both; }
-.m-orbit .burst .up { animation-duration: 1.2s; }
+.m-orbit .burst line { stroke-width: 1.6; stroke-dasharray: 1 1; stroke-dashoffset: 1; animation: m-shoot 2.4s var(--ease) var(--d, 0s) both; }
+.m-orbit .burst .in-leg { stroke: #cdb935; }
+.m-orbit .burst .out-leg { stroke: var(--leaf); }
 @keyframes m-shoot { 0% { stroke-dashoffset: 1; opacity: 1; } 35% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
 .m-orbit .hub { fill: var(--ink); }
 .m-orbit .hub-t { font-family: var(--font-mono-site), monospace; font-size: 9px; letter-spacing: 0.1em; fill: var(--paper); }
 .m-orbit-feed { text-align: center; color: var(--ink-2); margin-top: 18px; animation: m-fade 0.7s var(--ease) both; }
-.m-orbit-feed b { color: var(--red); font-weight: 500; margin-right: 6px; }
+.m-orbit-feed b { color: #9a8a1c; font-weight: 500; }
+.m-orbit-feed b.to { color: var(--leaf); }
 .m-net-q { margin: 0; max-width: 24ch; text-align: center; font-size: clamp(30px, 3.8vw, 56px); line-height: 1.06; letter-spacing: -0.02em; }
 .m-net-q em { color: var(--leaf); }
 .m-net-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 3vw, 48px); width: 100%; margin-top: clamp(80px, 10vw, 140px); }
