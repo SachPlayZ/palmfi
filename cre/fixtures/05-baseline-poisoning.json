@@ -6,5 +6,7 @@
   "setup": "A large request after a few planted outliers still carries UNUSUAL_AMOUNT (robust median/MAD; history learns only executed outflows).",
   "expect": "UNUSUAL_AMOUNT",
   "unitTest": "sentinel/failure-matrix.test.ts row 5",
-  "enabled": false
+  "enabled": true,
+  "evmTxHash": "0xb960c2a690965d9c833efa444b2beffda585e4613712b7069cf6504d7cfb5183",
+  "evmEventIndex": 1
 }

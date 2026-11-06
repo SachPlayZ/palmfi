@@ -47,7 +47,7 @@ As `n2`, Send $8 to the payroll address: above the $5 budget, so it queues (1 US
 With nvidia frozen, as `p1` try to pay `nvidia` again: the quote fails (`FrozenToken`). The frozen token is out of the pool until a majority unfreezes. Unfreeze: `n1` proposes **Unfreeze** on the Incident view, `n2` and `n3` vote → active.
 
 ### 6. Chainlink CRE and Arc Studio (30s)
-- `cd cre && bun run simulate`: the failure-matrix fixtures (baseline heartbeat, replay skipped, Sybil re-score). Logs: [`cre/fixtures/logs/`](../cre/fixtures/logs).
+- `cd cre && bun run simulate`: the failure-matrix fixtures recorded on Arc (baseline heartbeat, replay skipped, baseline poisoning still UNUSUAL_AMOUNT, Sybil re-score, frozen Vault skipped). Logs: [`cre/fixtures/logs/`](../cre/fixtures/logs).
 - Arc Studio: the app's chat shows the build, the 58/58 test run on an Arc fork and the security review; [`docs/audits/`](audits) shows the 7 fixes that came out of it.
 
 **Close:** *Your keys can be stolen. Your money can't leave faster than your team can say no.*

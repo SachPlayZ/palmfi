@@ -5,9 +5,12 @@
  * deposits USDC, then queues an unwrap. Prints the tx hash + Hub log index to pass to
  *   cre workflow simulate sentinel --evm-tx-hash <hash> --evm-event-index <i>
  *
- *   bun shared/scripts/live-request.ts [known|new|huge]
+ *   bun shared/scripts/live-request.ts [known|new|huge|poison|grief]
  *     known: $3 to an onboarding destination (→ short delay)   new: $3 to a fresh address (→ longer delay)
  *     huge:  $9 at the Hard cap's edge to a fresh address (→ capDelay, or FLAG once the baseline exists)
+ *     poison: Vault "cre-poison": plants small instant outflows plus 2 outliers near the request, then queues $2
+ *             (fixture 05: still UNUSUAL_AMOUNT)
+ *     grief:  Vault "cre-grief": queues $2, then a wallet freezes the Vault (fixture 08: SKIP_VAULT_INACTIVE)
  */
 import { join } from "node:path";
 import { createPublicClient, createWalletClient, defineChain, encodeEventTopics, http, parseAbi, type Hex } from "viem";
@@ -31,12 +34,12 @@ const rpc = http(process.env.ARC_RPC_URL);
 const pub = createPublicClient({ chain: arc, transport: rpc });
 const wallet = createWalletClient({ chain: arc, transport: rpc, account });
 
-const NAME = "cre-sim";
+const mode = process.argv[2] ?? "known";
+const NAME = mode === "poison" ? "cre-poison" : mode === "grief" ? "cre-grief" : "cre-sim";
 const KNOWN = "0x000000000000000000000000000000000000dead" as Hex; // onboarding destination
 const NEW = `0x${Date.now().toString(16).padStart(40, "0")}` as Hex;
-const mode = process.argv[2] ?? "known";
 const dest = mode === "known" ? KNOWN : NEW;
-const amount = mode === "huge" ? 9_000000n : 3_000000n;
+const amount = mode === "huge" ? 9_000000n : mode === "poison" || mode === "grief" ? 2_000000n : 3_000000n;
 
 const factoryAbi = parseAbi([
   "struct VaultConfig { address[] wallets; address recoveryKey; address recoveryVault; uint128 budget24h; uint128 budget7d; uint128 hardCap; uint32 floorDelay; uint32 maxDelay; uint32 capDelay; address[] destinations; uint8 bizStartHourUtc; uint8 bizEndHourUtc; uint128 usualMaxPayout; }",
@@ -47,7 +50,12 @@ const erc20 = parseAbi(["function approve(address, uint256) returns (bool)", "fu
 const vaultAbi = parseAbi([
   "function deposit(uint256 amount, address to)",
   "function requestUnwrap(uint256 amount, address destination) returns (uint256)",
+  "function unwrap(uint256 amount, address destination)",
+  "function freeze()",
 ]);
+// poison: 6 routine $0.10 outflows and 2 planted $1.50 outliers, all instant (within the $4 budget) so they enter the baseline.
+const PLANTED = mode === "poison" ? [...Array(6).fill(100000n), 1_500000n, 1_500000n] : [];
+const planted = PLANTED.reduce((a, b) => a + b, 0n);
 
 const send = async (req: Parameters<typeof wallet.writeContract>[0], what: string) => {
   const hash = await wallet.writeContract(req);
@@ -59,7 +67,7 @@ const send = async (req: Parameters<typeof wallet.writeContract>[0], what: strin
 
 const balance = await pub.readContract({ address: USDC, abi: erc20, functionName: "balanceOf", args: [account.address] });
 console.log(`sim wallet ${account.address}, ${balance} USDC (6dp)`);
-if (balance < 15_000000n) throw new Error("fund the sim wallet with ~20 testnet USDC (faucet.circle.com, Arc Testnet)");
+if (balance < amount + planted + 1_500000n) throw new Error("fund the sim wallet with ~20 testnet USDC (faucet.circle.com, Arc Testnet)");
 
 let vault = (await pub.readContract({ address: dep.hub, abi: hubAbi, functionName: "resolve", args: [NAME] })) as Hex;
 if (/^0x0+$/.test(vault)) {
@@ -74,9 +82,11 @@ if (/^0x0+$/.test(vault)) {
           wallets: [account.address, "0x000000000000000000000000000000000000c0c1", "0x000000000000000000000000000000000000c0c2"],
           recoveryKey: "0x000000000000000000000000000000000000c0de",
           recoveryVault: "0x000000000000000000000000000000000000fade",
-          budget24h: 1_000000n, budget7d: 4_000000n, hardCap: 8_000000n,
+          ...(mode === "poison"
+            ? { budget24h: 4_000000n, budget7d: 10_000000n, hardCap: 8_000000n }
+            : { budget24h: 1_000000n, budget7d: 4_000000n, hardCap: 8_000000n }),
           floorDelay: 15 * 60, maxDelay: 72 * 3600, capDelay: 24 * 3600,
-          destinations: [KNOWN], bizStartHourUtc: 9, bizEndHourUtc: 17, usualMaxPayout: 3_000000n,
+          destinations: [KNOWN], bizStartHourUtc: 9, bizEndHourUtc: 17, usualMaxPayout: mode === "poison" ? 500000n : 3_000000n,
         },
       ],
     } as never,
@@ -86,13 +96,17 @@ if (/^0x0+$/.test(vault)) {
 }
 console.log(`vault "${NAME}" = ${vault}`);
 
-const need = amount + 1_000000n; // + 1 USDC bond
+const need = amount + planted + 1_000000n; // + 1 USDC bond
 await send({ address: USDC, abi: erc20, functionName: "approve", args: [vault, need] } as never, "approve");
 await send({ address: vault, abi: vaultAbi, functionName: "deposit", args: [need, account.address] } as never, "deposit");
+for (const [i, p] of PLANTED.entries())
+  await send({ address: vault, abi: vaultAbi, functionName: "unwrap", args: [p, p > 1_000000n ? NEW : KNOWN] } as never, `plant ${i + 1}/${PLANTED.length} unwrap ${p}`);
 const r = await send(
   { address: vault, abi: vaultAbi, functionName: "requestUnwrap", args: [amount, dest] } as never,
   `requestUnwrap ${amount} → ${mode} destination`,
 );
+
+if (mode === "grief") await send({ address: vault, abi: vaultAbi, functionName: "freeze", args: [] } as never, "freeze");
 
 const topic = encodeEventTopics({ abi: hubEventsAbi, eventName: "RequestQueued" })[0];
 const i = r.logs.findIndex((l) => l.address.toLowerCase() === dep.hub.toLowerCase() && l.topics[0] === topic);
