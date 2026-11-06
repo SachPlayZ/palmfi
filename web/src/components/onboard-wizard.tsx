@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { isAddress, zeroAddress, type Address } from "viem";
+import { english, generateMnemonic, mnemonicToAccount } from "viem/accounts";
 import { useAccount, useReadContract } from "wagmi";
 import { hubAbi, vaultFactoryAbi } from "@/abi";
 import { deployments } from "@/lib/deployments";
@@ -172,6 +173,8 @@ export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () 
   const [wallets, setWallets] = useState<string[]>([]);
   const [recoveryVault, setRecoveryVault] = useState("");
   const [recoveryKey, setRecoveryKey] = useState("");
+  const [recMode, setRecMode] = useState<"new" | "own">("new");
+  const [seedSaved, setSeedSaved] = useState(false);
   const [preset, setPreset] = useState<(typeof PRESETS)[number]["k"]>("demo");
   const p0 = PRESETS.find((p) => p.k === preset)!;
   const [lim, setLim] = useState<Record<"b24" | "b7" | "cap" | "floor" | "max" | "capH", string>>(
@@ -209,7 +212,9 @@ export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () 
   const errs: Record<number, string | undefined> = {
     0: !isValidName(name) ? "Lowercase letters, digits and hyphens, up to 32" : taken.isLoading ? "Checking…" : owner ? "That name is taken" : undefined,
     1: wallets.length < MIN_WALLETS ? `Add at least ${MIN_WALLETS} wallets (you have ${wallets.length})` : undefined,
-    2: !isAddress(recoveryVault)
+    2: recMode === "new" && !seedSaved
+      ? "Confirm you've saved your recovery phrase"
+      : !isAddress(recoveryVault)
       ? "Set a recovery vault address"
       : recoveryKey && !isAddress(recoveryKey)
         ? "Recovery key must be an address"
@@ -321,27 +326,54 @@ export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () 
         title="Set a recovery address"
         body="If the vault is ever paused, funds can only move here. Changing it later takes seven days' notice."
       />
-      <div className="pf-grid2">
-        <Field label="Recovery vault (required)" hint="A cold wallet or multisig nobody uses day to day.">
-          <Input
-            mono
-            value={recoveryVault}
-            onChange={(e) => setRecoveryVault(e.target.value.trim())}
-            placeholder="0x…"
-            bad={!!recoveryVault && !isAddress(recoveryVault)}
-          />
-        </Field>
-        <Field label="Recovery key (optional)" hint="A cold key that can only unfreeze or migrate. It can never spend.">
-          <Input
-            mono
-            value={recoveryKey}
-            onChange={(e) => setRecoveryKey(e.target.value.trim())}
-            placeholder="0x…"
-            bad={!!recoveryKey && !isAddress(recoveryKey)}
-          />
-        </Field>
+      <div className="grid grid-cols-2 gap-1 rounded-full bg-[var(--paper-2)] p-1 text-[14px]" role="tablist">
+        {(
+          [
+            ["new", "Create one for me"],
+            ["own", "Use my own address"],
+          ] as const
+        ).map(([k, l]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={recMode === k}
+            className={`rounded-full px-4 py-2 transition-colors ${recMode === k ? "bg-white shadow-sm" : "text-[var(--subtle)]"}`}
+            onClick={() => {
+              setRecMode(k);
+              setRecoveryVault("");
+              setSeedSaved(false);
+            }}
+          >
+            {l}
+          </button>
+        ))}
       </div>
-      <Notice tone="amber">Double-check this address. Nobody, including your own approvers, can change it quickly.</Notice>
+      {recMode === "new" ? (
+        <RecoverySeed onAddress={setRecoveryVault} saved={seedSaved} setSaved={setSeedSaved} label={name || "palmfi"} />
+      ) : (
+        <div className="pf-grid2">
+          <Field label="Recovery address (required)" hint="A cold wallet or multisig nobody uses day to day.">
+            <Input
+              mono
+              value={recoveryVault}
+              onChange={(e) => setRecoveryVault(e.target.value.trim())}
+              placeholder="0x…"
+              bad={!!recoveryVault && !isAddress(recoveryVault)}
+            />
+          </Field>
+          <Field label="Recovery key (optional)" hint="A cold key that can only unfreeze or migrate. It can never spend.">
+            <Input
+              mono
+              value={recoveryKey}
+              onChange={(e) => setRecoveryKey(e.target.value.trim())}
+              placeholder="0x…"
+              bad={!!recoveryKey && !isAddress(recoveryKey)}
+            />
+          </Field>
+        </div>
+      )}
+      {recMode === "own" && <Notice tone="amber">Double-check this address. Nobody, including your own approvers, can change it quickly.</Notice>}
     </div>,
     <div key="3" className="flex flex-col gap-6">
       <PaneHead title="Spending limits" body="Payments inside the instant budget go out at once. Anything above it gets a short review." />
@@ -505,6 +537,92 @@ export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () 
           </Button>
         )}
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Generates a fresh recovery wallet in the browser. The phrase lives only in this
+ * component's state: it is never sent anywhere and is gone once the modal closes.
+ */
+function RecoverySeed({ onAddress, saved, setSaved, label }: { onAddress: (a: string) => void; saved: boolean; setSaved: (b: boolean) => void; label: string }) {
+  const [phrase, setPhrase] = useState("");
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const address = phrase ? mnemonicToAccount(phrase).address : "";
+  const make = () => {
+    setPhrase(generateMnemonic(english));
+    setSaved(false);
+    setShown(false);
+  };
+  useEffect(() => {
+    onAddress(address);
+  }, [address, onAddress]);
+  useEffect(() => {
+    if (!phrase) make();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const words = phrase.split(" ");
+  const download = () => {
+    const body = `palmfi recovery wallet for ${label}\n\nAddress: ${address}\n\nRecovery phrase (12 words, keep offline and private):\n${words
+      .map((w, i) => `${String(i + 1).padStart(2, " ")}. ${w}`)
+      .join("\n")}\n`;
+    const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `palmfi-recovery-${label}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[14px] text-[var(--subtle)]">
+        We&apos;ve created a new wallet just for recovery. Its 12-word phrase is generated on this device and never leaves it. Anyone with these words controls your
+        recovery funds, and if you lose them we can&apos;t restore them.
+      </p>
+      <div className="relative rounded-2xl border border-[var(--line)] bg-[var(--paper-2)] p-4">
+        <ol className={`grid grid-cols-3 gap-2 transition-[filter] duration-300 ${shown ? "" : "pointer-events-none blur-[6px] select-none"}`}>
+          {words.map((w, i) => (
+            <li key={i} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-mono text-[13.5px]">
+              <span className="pf-dim w-5 text-[11px]">{i + 1}</span>
+              {w}
+            </li>
+          ))}
+        </ol>
+        {!shown && (
+          <button type="button" className="pf-btn dark sm absolute inset-0 m-auto h-fit w-fit" onClick={() => setShown(true)}>
+            Reveal recovery phrase
+          </button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="pf-btn line sm"
+          disabled={!shown}
+          onClick={() => {
+            navigator.clipboard.writeText(phrase);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? "Copied" : "Copy words"}
+        </button>
+        <button type="button" className="pf-btn line sm" disabled={!shown} onClick={download}>
+          Download backup
+        </button>
+        <button type="button" className="pf-btn ghost sm" onClick={make}>
+          Generate a new one
+        </button>
+      </div>
+      <dl className="pf-kv">
+        <dt>Recovery address</dt>
+        <dd className="truncate font-mono text-[13px]">{address}</dd>
+      </dl>
+      <label className={`flex items-start gap-3 text-[14px] ${shown ? "" : "opacity-50"}`}>
+        <input type="checkbox" className="mt-1" disabled={!shown} checked={saved} onChange={(e) => setSaved(e.target.checked)} />
+        I&apos;ve written these 12 words down and stored them somewhere safe and offline.
+      </label>
     </div>
   );
 }
