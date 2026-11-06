@@ -39,8 +39,8 @@ describe("/api/notify", () => {
     expect((await handleNotify(notifyReq({ vault: "0x12", kind: "FLAG" }), deps)).status).toBe(400);
     expect((await handleNotify(notifyReq({ vault: VAULT, kind: "PARTY" }), deps)).status).toBe(400);
     expect((await handleNotify(notifyReq("{not json"), deps)).status).toBe(400);
-    expect(parseNotifyBody({ vault: VAULT, kind: "hold", requestId: "0x10", reasonCodes: 5 })).toMatchObject({
-      kind: "HOLD",
+    expect(parseNotifyBody({ vault: VAULT, kind: "delay", requestId: "0x10", reasonCodes: 5 })).toMatchObject({
+      kind: "DELAY",
       requestId: "16",
       reasonCodes: "5",
     });
@@ -48,7 +48,7 @@ describe("/api/notify", () => {
 
   it("returns delivered=false when no chat is linked", async () => {
     const f = tgFetch();
-    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "HOLD", requestId: 1 }), { env, kv: memKv(), fetch: f });
+    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "DELAY", requestId: 1 }), { env, kv: memKv(), fetch: f });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ delivered: false });
     expect(f).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe("/api/notify", () => {
     const f = tgFetch();
     const kv = memKv({ [chatKey(VAULT)]: "4242" });
     const res = await handleNotify(
-      notifyReq({ vault: VAULT.toUpperCase().replace("0X", "0x"), kind: "FLAG", requestId: "3", reasonCodes: String(1 | 4) }),
+      notifyReq({ vault: VAULT.toUpperCase().replace("0X", "0x"), kind: "FLAG", requestId: "3", reasonCodes: String(2 | 64) }),
       { env, kv, fetch: f },
     );
     expect(res.status).toBe(200);
@@ -74,14 +74,25 @@ describe("/api/notify", () => {
     expect(sent.text).toContain(`/vault/${VAULT}/incident`);
   });
 
+  it("fans out to every linked Voter chat and shows score and delay", async () => {
+    const f = tgFetch();
+    const kv = memKv({ [chatKey(VAULT)]: "1,2,3" });
+    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "DELAY", requestId: 7, score: "18000", delay: "133200" }), { env, kv, fetch: f });
+    expect(await res.json()).toMatchObject({ delivered: true, chats: 3 });
+    expect(f).toHaveBeenCalledTimes(3);
+    const text = JSON.parse(String(f.mock.calls[0][1]?.body)).text;
+    expect(text).toContain("Surprise score 18.0 bits");
+    expect(text).toContain("Executable in 1d 13h");
+  });
+
   it("reports Telegram failures as 502", async () => {
     const kv = memKv({ [chatKey(VAULT)]: "1" });
-    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "HOLD" }), { env, kv, fetch: tgFetch(false) });
+    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "DELAY" }), { env, kv, fetch: tgFetch(false) });
     expect(res.status).toBe(502);
   });
 
   it("503s when unconfigured", async () => {
-    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "HOLD" }), { env: {}, kv: null, fetch: tgFetch() });
+    const res = await handleNotify(notifyReq({ vault: VAULT, kind: "DELAY" }), { env: {}, kv: null, fetch: tgFetch() });
     expect(res.status).toBe(503);
   });
 
@@ -154,6 +165,15 @@ describe("telegram linking", () => {
     expect(await res.json()).toMatchObject({ linked: true });
     expect(kv.data[chatKey(VAULT)]).toBe("99");
     expect(f).toHaveBeenCalledOnce();
+    // a second Voter links their own chat; relinking the first is idempotent
+    const again = (id: number) =>
+      handleTelegramWebhook(
+        new Request("http://x", { method: "POST", headers: { "x-telegram-bot-api-secret-token": "hook" }, body: JSON.stringify({ message: { text: `/start ${token}`, chat: { id } } }) }),
+        { env: tgEnv, kv, fetch: f },
+      );
+    await again(100);
+    await again(99);
+    expect(kv.data[chatKey(VAULT)]).toBe("99,100");
   });
 
   it("ignores /start with a forged token", async () => {

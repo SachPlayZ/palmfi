@@ -12,14 +12,22 @@ export const hubAbi = [
         "name": "forwarder_",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "resolver_",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "BLOCK_TTL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -53,6 +61,25 @@ export const hubAbi = [
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "blockedUntil",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -91,9 +118,14 @@ export const hubAbi = [
             "internalType": "bytes32"
           },
           {
-            "name": "verdict",
-            "type": "uint8",
-            "internalType": "uint8"
+            "name": "delay",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "score",
+            "type": "uint32",
+            "internalType": "uint32"
           },
           {
             "name": "reasonCodes",
@@ -117,26 +149,7 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "dnsNameOf",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "emitConfigChangeRequested",
+    "name": "emitConfigChange",
     "inputs": [
       {
         "name": "changeId",
@@ -154,6 +167,11 @@ export const hubAbi = [
         "internalType": "bytes"
       },
       {
+        "name": "yesVotes",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
         "name": "eta",
         "type": "uint64",
         "internalType": "uint64"
@@ -164,15 +182,15 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "emitHookSwap",
+    "name": "emitOutflow",
     "inputs": [
       {
-        "name": "hotWallet",
+        "name": "wallet",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "asset",
+        "name": "destination",
         "type": "address",
         "internalType": "address"
       },
@@ -182,14 +200,9 @@ export const hubAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "isUnwrap",
+        "name": "viaPool",
         "type": "bool",
         "internalType": "bool"
-      },
-      {
-        "name": "usdValue",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -197,20 +210,40 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "emitNetworkTransfer",
+    "name": "emitRequestQueued",
     "inputs": [
       {
-        "name": "payee",
-        "type": "address",
-        "internalType": "address"
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "asset",
+        "name": "requestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "kind",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "wallet",
         "type": "address",
         "internalType": "address"
       },
       {
         "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "destination",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "reasonCodes",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -238,93 +271,9 @@ export const hubAbi = [
         "internalType": "uint64"
       },
       {
-        "name": "reasonCodes",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "emitSafeHarborSwap",
-    "inputs": [
-      {
-        "name": "hotWallet",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amountIn",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "amountOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "minOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "emitSecondFactorConfirmed",
-    "inputs": [
-      {
-        "name": "requestId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "requestHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "emitUnwrapRequested",
-    "inputs": [
-      {
-        "name": "requestId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "requestHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "destination",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "usdValue",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "score",
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
         "name": "reasonCodes",
@@ -337,17 +286,32 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "extendFreeze",
+    "name": "emitVoted",
     "inputs": [
       {
-        "name": "vault",
+        "name": "requestId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "voter",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "until",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "yes",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "yesVotes",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "noVotes",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "outputs": [],
@@ -375,25 +339,6 @@ export const hubAbi = [
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "freezeLockedUntil",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
       }
     ],
     "stateMutability": "view"
@@ -475,20 +420,7 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "markRevoked",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "marketMode",
+    "name": "nameOf",
     "inputs": [
       {
         "name": "",
@@ -499,8 +431,8 @@ export const hubAbi = [
     "outputs": [
       {
         "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -555,7 +487,7 @@ export const hubAbi = [
             "internalType": "uint256"
           },
           {
-            "name": "usdValue",
+            "name": "amount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -563,6 +495,21 @@ export const hubAbi = [
             "name": "state",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "scored",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "fastTracked",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "executableAt",
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "requestHash",
@@ -676,19 +623,14 @@ export const hubAbi = [
         "internalType": "address"
       },
       {
-        "name": "owner",
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "token",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "dnsName",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
-        "name": "institution",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -696,43 +638,62 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "registry",
-    "inputs": [],
+    "name": "resolve",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
     "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract INetworkRegistry"
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "resolver",
-    "inputs": [],
-    "outputs": [
+    "name": "revoke",
+    "inputs": [
       {
-        "name": "",
+        "name": "vault",
         "type": "address",
-        "internalType": "contract IEnsResolver"
+        "internalType": "address"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "setWiring",
+    "name": "setFactory",
     "inputs": [
       {
         "name": "factory_",
         "type": "address",
         "internalType": "address"
-      },
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setVerified",
+    "inputs": [
       {
-        "name": "registry_",
+        "name": "vault",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "v",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -778,6 +739,19 @@ export const hubAbi = [
   },
   {
     "type": "function",
+    "name": "unblock",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "usedReports",
     "inputs": [
       {
@@ -810,6 +784,19 @@ export const hubAbi = [
   },
   {
     "type": "function",
+    "name": "vaultFreeze",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "vaultMigrated",
     "inputs": [
       {
@@ -823,23 +810,29 @@ export const hubAbi = [
   },
   {
     "type": "function",
-    "name": "vaultPaused",
-    "inputs": [
-      {
-        "name": "paused",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
+    "name": "vaultUnfreeze",
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "vaultUnfreeze",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "name": "verified",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -882,7 +875,32 @@ export const hubAbi = [
   },
   {
     "type": "event",
-    "name": "ConfigChangeRequested",
+    "name": "Blocked",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sourceVault",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "until",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ConfigChange",
     "inputs": [
       {
         "name": "vault",
@@ -909,29 +927,16 @@ export const hubAbi = [
         "internalType": "bytes"
       },
       {
+        "name": "yesVotes",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
         "name": "eta",
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "EnsWriteFailed",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "status",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
       }
     ],
     "anonymous": false
@@ -978,6 +983,12 @@ export const hubAbi = [
         "internalType": "address"
       },
       {
+        "name": "by",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
         "name": "reasonCodes",
         "type": "uint256",
         "indexed": false,
@@ -1007,68 +1018,6 @@ export const hubAbi = [
   },
   {
     "type": "event",
-    "name": "HookSwap",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "hotWallet",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "isUnwrap",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      },
-      {
-        "name": "usdValue",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MarketModeSet",
-    "inputs": [
-      {
-        "name": "asset",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "mode",
-        "type": "uint8",
-        "indexed": false,
-        "internalType": "uint8"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Migrated",
     "inputs": [
       {
@@ -1088,7 +1037,7 @@ export const hubAbi = [
   },
   {
     "type": "event",
-    "name": "NetworkTransfer",
+    "name": "NameVerified",
     "inputs": [
       {
         "name": "vault",
@@ -1097,13 +1046,38 @@ export const hubAbi = [
         "internalType": "address"
       },
       {
-        "name": "payee",
+        "name": "name",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "verified",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Outflow",
+    "inputs": [
+      {
+        "name": "vault",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "asset",
+        "name": "wallet",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "destination",
         "type": "address",
         "indexed": false,
         "internalType": "address"
@@ -1113,22 +1087,9 @@ export const hubAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "PausedChanged",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       },
       {
-        "name": "paused",
+        "name": "viaPool",
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
@@ -1188,6 +1149,61 @@ export const hubAbi = [
   },
   {
     "type": "event",
+    "name": "RequestQueued",
+    "inputs": [
+      {
+        "name": "vault",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "requestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "kind",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "wallet",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "destination",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "reasonCodes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "RequestUpdated",
     "inputs": [
       {
@@ -1215,72 +1231,16 @@ export const hubAbi = [
         "internalType": "uint64"
       },
       {
+        "name": "score",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
         "name": "reasonCodes",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "SafeHarborSwap",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "hotWallet",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amountIn",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "amountOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "minOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "SecondFactorConfirmed",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "requestId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "requestHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -1319,7 +1279,32 @@ export const hubAbi = [
   },
   {
     "type": "event",
-    "name": "UnwrapRequested",
+    "name": "VaultRegistered",
+    "inputs": [
+      {
+        "name": "vault",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Voted",
     "inputs": [
       {
         "name": "vault",
@@ -1334,71 +1319,28 @@ export const hubAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "requestHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "asset",
+        "name": "voter",
         "type": "address",
         "indexed": false,
         "internalType": "address"
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "destination",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "usdValue",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "reasonCodes",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "VaultRegistered",
-    "inputs": [
-      {
-        "name": "vault",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "dnsName",
-        "type": "bytes",
-        "indexed": false,
-        "internalType": "bytes"
-      },
-      {
-        "name": "institution",
+        "name": "yes",
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
+      },
+      {
+        "name": "yesVotes",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
+      },
+      {
+        "name": "noVotes",
+        "type": "uint16",
+        "indexed": false,
+        "internalType": "uint16"
       }
     ],
     "anonymous": false
@@ -1472,12 +1414,17 @@ export const hubAbi = [
   },
   {
     "type": "error",
+    "name": "BadName",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BadTransition",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "FreezeLocked",
+    "name": "NameTaken",
     "inputs": []
   },
   {
@@ -1493,11 +1440,6 @@ export const hubAbi = [
   {
     "type": "error",
     "name": "NotForwarder",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRegistry",
     "inputs": []
   },
   {

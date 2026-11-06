@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { AbiEvent, Address } from "viem";
 import { usePublicClient } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { arcTestnet } from "./network";
 import { deployments } from "./deployments";
 
 const STEP = 40_000n;
@@ -13,7 +13,7 @@ export function useEventLogs<E extends AbiEvent>(
   key: string,
   params: { address: Address | undefined; event: E; args?: Record<string, unknown>; enabled?: boolean },
 ) {
-  const client = usePublicClient({ chainId: sepolia.id });
+  const client = usePublicClient({ chainId: arcTestnet.id });
   return useQuery({
     queryKey: ["logs", key, params.address, JSON.stringify(params.args ?? {})],
     enabled: !!client && !!params.address && params.enabled !== false,

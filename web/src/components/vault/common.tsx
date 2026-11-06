@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatUnits, parseUnits, type Address } from "viem";
-import { useAccount } from "wagmi";
-import type { AssetInfo, VaultView } from "@/lib/vault";
-import { network } from "@/lib/network";
+import { formatUnits, isAddress, parseUnits, type Address } from "viem";
+import { useAccount, useReadContract } from "wagmi";
+import { hubAbi, vaultFactoryAbi } from "@/abi";
+import { deployments } from "@/lib/deployments";
+import { arcTestnet } from "@/lib/network";
+import type { VaultView } from "@/lib/vault";
 
 export function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -15,29 +17,27 @@ export function useNow(intervalMs = 1000): number {
   return now;
 }
 
-const eq = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+export const eq = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 
+/** Every wallet is a Voter; the Recovery key can only unfreeze or migrate. */
 export function useRoles(v: VaultView) {
   const { address } = useAccount();
   const s = v.s;
   return {
     address,
-    isHot: !!s && !!address && s.hotWallets.some((h) => eq(h, address)),
-    isOwner: eq(s?.owner, address),
+    isWallet: !!s && !!address && s.wallets.some((w) => eq(w, address)),
     isRecovery: eq(s?.recoveryKey, address),
-    isGuardian: eq(s?.guardian, address),
-    isApprover: eq(s?.approver, address),
   };
 }
 
-export function fmtAmount(v: bigint, decimals: number, max = 6): string {
+export function fmtAmount(v: bigint, decimals = 6, max = 6): string {
   const s = formatUnits(v, decimals);
   const [w, f = ""] = s.split(".");
   const frac = f.slice(0, max).replace(/0+$/, "");
   return frac ? `${w}.${frac}` : w;
 }
 
-export function safeParse(amount: string, decimals: number): bigint | undefined {
+export function safeParse(amount: string, decimals = 6): bigint | undefined {
   try {
     const v = parseUnits(amount.trim(), decimals);
     return v > 0n ? v : undefined;
@@ -46,15 +46,28 @@ export function safeParse(amount: string, decimals: number): bigint | undefined 
   }
 }
 
-export function assetLabel(a: AssetInfo): string {
-  if (a.underlying.toLowerCase() === network.tokens.weth.toLowerCase()) return "ETH";
-  return a.underlyingSymbol;
-}
-
-export function isWeth(a: Address | undefined) {
-  return !!a && a.toLowerCase() === network.tokens.weth.toLowerCase();
-}
-
-export function findAsset(v: VaultView, underlying: Address | undefined) {
-  return v.assets.find((a) => eq(a.underlying, underlying));
+/** Resolves an address or a Hub name to an address, and says whether it's a palmfi Vault. */
+export function useDestination(input: string) {
+  const trimmed = input.trim();
+  const direct = isAddress(trimmed) ? (trimmed as Address) : undefined;
+  const name = !direct && trimmed ? trimmed.toLowerCase() : "";
+  const r = useReadContract({
+    address: deployments.hub,
+    abi: hubAbi,
+    functionName: "resolve",
+    args: [name],
+    chainId: arcTestnet.id,
+    query: { enabled: !!name && !!deployments.hub },
+  });
+  const viaName = r.data && !/^0x0{40}$/.test(r.data) ? (r.data as Address) : undefined;
+  const address = direct ?? viaName;
+  const isVault = useReadContract({
+    address: deployments.factory,
+    abi: vaultFactoryAbi,
+    functionName: "isVault",
+    args: [address!],
+    chainId: arcTestnet.id,
+    query: { enabled: !!address && !!deployments.factory },
+  });
+  return { address, name, resolving: r.isLoading, unknownName: !!name && r.isSuccess && !viaName, isVault: !!isVault.data };
 }

@@ -1,154 +1,142 @@
 "use client";
 
 import { useState } from "react";
-import { encodeAbiParameters, type Hex } from "viem";
-import { useReadContract } from "wagmi";
-import { sepolia } from "wagmi/chains";
-import { approvalBookAbi, vaultAbi } from "@/abi";
-import { deployments } from "@/lib/deployments";
-import { REQ, REQ_LABEL, decodeReasonCodes, formatUsd } from "@/lib/palm";
-import { isOpen as open, requestTimeline } from "@/lib/requests";
+import { vaultAbi } from "@/abi";
+import { assess, type ScoringContext } from "@/lib/deviation";
+import { KIND, REQ, REQ_LABEL, decodeReasonCodes, formatBits, formatUsd } from "@/lib/palm";
+import { requestTimeline, voteProgress } from "@/lib/requests";
 import { TxStatus, useTx } from "@/lib/tx";
-import type { VaultRequest, VaultView } from "@/lib/vault";
-import { signWithPasskey } from "@/lib/webauthn";
+import { useHasVoted, useScoringContext, type VaultRequest, type VaultView } from "@/lib/vault";
 import { Badge, Button, Card, Mono, short } from "../ui";
-import { findAsset, fmtAmount, assetLabel, useNow, useRoles } from "./common";
+import { eq, useNow, useRoles } from "./common";
 
-const stateTone: Record<number, "gray" | "green" | "amber" | "red" | "blue"> = {
-  1: "blue",
-  2: "green",
-  3: "amber",
-  4: "red",
-  5: "gray",
-  6: "gray",
-  7: "gray",
-};
+const stateTone: Record<number, "gray" | "green" | "amber" | "red" | "blue"> = { 1: "blue", 2: "green", 3: "amber", 4: "gray", 5: "red", 6: "gray" };
+
+/** Re-runs the Sentinel's pure model on the same onchain inputs, so the delay is explained term by term. */
+function WhyDelay({ v, r }: { v: VaultView; r: VaultRequest }) {
+  const ctx = useScoringContext(v.vault, r.id);
+  if (!ctx.data) return <p className="text-xs text-[var(--subtle)]">Loading the Sentinel&apos;s inputs…</p>;
+  const a = assess(ctx.data as unknown as ScoringContext);
+  const rows: [string, number][] = [
+    ["Amount vs usual", a.terms.amount],
+    ["Destination", a.terms.dest],
+    ["Time of day", a.terms.time],
+    ["Velocity", a.terms.velocity],
+    ["Flags", a.terms.flags],
+  ];
+  return (
+    <div className="rounded-lg bg-[var(--muted)] p-2 text-xs">
+      <p className="mb-1">
+        Surprise score <strong>{formatBits(a.score)}</strong> ({a.scope} baseline) → {a.action === "FLAG" ? "FLAG (freeze)" : `delay ${Math.round(Number(a.delay) / 60)} min`}
+      </p>
+      <ul className="grid grid-cols-2 gap-x-4">
+        {rows.map(([k, mb]) => (
+          <li key={k} className="flex justify-between">
+            <span className="text-[var(--subtle)]">{k}</span>
+            <span className="tabular">{formatBits(mb)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[var(--subtle)]">Every bit doubles the delay; ≥ 28 bits freezes the Vault.</p>
+    </div>
+  );
+}
 
 function RequestRow({ v, r }: { v: VaultView; r: VaultRequest }) {
-  const s = v.s!;
   const roles = useRoles(v);
   const now = useNow();
   const tx = useTx();
-  const [msg, setMsg] = useState<string>();
-  const asset = findAsset(v, r.asset);
-  const t = requestTimeline(r, s.institution, s.floorDelay, now);
+  const [why, setWhy] = useState(false);
+  const voted = useHasVoted(v.vault, r.id, roles.address);
+  const t = requestTimeline(r, now);
+  const votes = voteProgress(r);
   const reasons = decodeReasonCodes(r.reasonCodes);
-  const approval = useReadContract({
-    address: deployments.approvalBook,
-    abi: approvalBookAbi,
-    functionName: "get",
-    args: [v.vault!, r.requestHash],
-    chainId: sepolia.id,
-    query: { enabled: s.institution && open(r.state) && !!deployments.approvalBook, refetchInterval: 10_000 },
-  });
-  const posted = approval.data && approval.data.signature !== "0x" ? approval.data : undefined;
-  const canCancel = open(r.state) && (roles.isHot || roles.isGuardian || roles.isRecovery);
-
-  async function faceId() {
-    setMsg(undefined);
-    try {
-      const sig = await signWithPasskey(r.requestHash, { x: s.passkeyX, y: s.passkeyY });
-      await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "confirm", args: [r.id, sig] }, "Confirm with passkey");
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function submitApproval() {
-    if (!posted) return;
-    const sig = encodeAbiParameters([{ type: "uint64" }, { type: "bytes" }], [posted.expiry, posted.signature as Hex]);
-    await tx.send({ address: v.vault!, abi: vaultAbi, functionName: "confirm", args: [r.id, sig] }, "Submit Payout approval");
-  }
+  const pending = r.state === REQ.PENDING;
+  const mine = eq(r.requester, roles.address);
+  const canVote = pending && roles.isWallet && voted.data === false;
+  const send = (functionName: string, args: unknown[], label: string) => tx.send({ address: v.vault!, abi: vaultAbi, functionName, args }, label);
 
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-[var(--border)] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">#{r.id.toString()}</span>
-          <Badge tone={stateTone[r.state]}>{REQ_LABEL[r.state]}</Badge>
-          {r.secondFactor && <Badge tone="green">Second factor ✓</Badge>}
-          <span className="tabular text-sm">
-            {asset ? `${fmtAmount(r.amount, asset.decimals)} ${assetLabel(asset)}` : r.amount.toString()} · {formatUsd(r.usdValue)}
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="text-xs text-[var(--subtle)]">#{r.id.toString()}</span>
+          <span className="tabular font-semibold">{formatUsd(r.amount)}</span>
+          <span className="text-sm">
+            {r.kind === KIND.PAYMENT ? "pay Vault" : "unwrap to"} <Mono>{short(r.destination)}</Mono>
           </span>
+          <span className="text-xs text-[var(--subtle)]">by {short(r.requester)}</span>
         </div>
-        <span className="text-xs text-[var(--subtle)]">
-          to <Mono>{short(r.destination)}</Mono>
-        </span>
+        <div className="flex items-center gap-1">
+          {r.scored && <Badge tone="blue">{formatBits(r.score)}</Badge>}
+          <Badge tone={stateTone[r.state]}>{REQ_LABEL[r.state]}</Badge>
+        </div>
       </div>
       <p className={`text-sm ${t.ready ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--subtle)]"}`}>{t.text}</p>
+      {pending && (
+        <p className="text-xs text-[var(--subtle)]">
+          Veto {votes.veto.have}/{votes.veto.need} NO · Fast-track {votes.fastTrack.have}/{votes.fastTrack.need} YES · {r.voterCount} Voters
+          {voted.data && " · you voted"}
+        </p>
+      )}
       {reasons.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {reasons.map((c) => (
-            <span key={c.code} title={c.description}>
-              <Badge tone={c.code === "BLOCKLISTED_DEST" || c.code === "CONFIG_CHANGE_PENDING" ? "red" : "amber"}>{c.code}</Badge>
+          {reasons.map((x) => (
+            <span key={x.bit} title={x.description}>
+              <Badge tone={x.code === "CRE_SILENT" ? "gray" : "amber"}>{x.code}</Badge>
             </span>
           ))}
         </div>
       )}
-      {s.institution && open(r.state) && (
-        <p className="text-xs text-[var(--subtle)]">
-          Payout approval: {posted ? `posted, expires ${new Date(Number(posted.expiry) * 1000).toLocaleString()}` : "none posted yet (Approver view)"}
-        </p>
-      )}
       <div className="flex flex-wrap gap-2">
-        {!s.institution && open(r.state) && !r.secondFactor && (
-          <Button onClick={faceId} disabled={tx.busy}>
-            Confirm with Face ID / Touch ID
+        {canVote && !mine && (
+          <Button variant="danger" onClick={() => send("vote", [r.id, false], "Veto vote")} disabled={tx.busy}>
+            Veto
           </Button>
         )}
-        {s.institution && posted && open(r.state) && !r.secondFactor && (
-          <Button onClick={submitApproval} disabled={tx.busy}>
-            Submit Payout approval
+        {canVote && (
+          <Button variant="secondary" onClick={() => send("vote", [r.id, true], "Fast-track vote")} disabled={tx.busy}>
+            Fast-track
           </Button>
         )}
-        {s.institution && r.state === REQ.PENDING && roles.isRecovery && !r.recoveryApproved && (
-          <Button variant="secondary" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "recoveryApprove", args: [r.id] }, "Recovery key approval")}>
-            Approve with Recovery key
+        {pending && mine && (
+          <Button variant="secondary" onClick={() => send("cancel", [r.id], "Cancel")} disabled={tx.busy}>
+            Cancel
           </Button>
         )}
-        {r.executable && (
-          <Button onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "execute", args: [r.id] }, "Execute")} disabled={tx.busy}>
+        {pending && t.ready && (
+          <Button onClick={() => send("execute", [r.id], "Execute")} disabled={tx.busy}>
             Execute
           </Button>
         )}
-        {canCancel && !t.expired && (
-          <Button variant="secondary" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "cancel", args: [r.id] }, "Cancel")} disabled={tx.busy}>
-            Cancel (refund bond)
+        {pending && t.expired && (
+          <Button variant="secondary" onClick={() => send("expire", [r.id], "Close expired")} disabled={tx.busy}>
+            Close (refund bond)
           </Button>
         )}
-        {t.expired && (
-          <Button variant="secondary" onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "expire", args: [r.id] }, "Expire")} disabled={tx.busy}>
-            Close expired request
+        {pending && (
+          <Button variant="ghost" onClick={() => setWhy((x) => !x)}>
+            {why ? "Hide" : "Why this delay?"}
           </Button>
         )}
       </div>
-      {msg && <p className="text-xs text-red-600">{msg}</p>}
+      {why && <WhyDelay v={v} r={r} />}
       <TxStatus state={tx.state} />
     </li>
   );
 }
 
 export function RequestsCard({ v }: { v: VaultView }) {
-  if (!v.s) return null;
-  const openOnes = v.requests.filter((r) => open(r.state));
-  const closed = v.requests.filter((r) => !open(r.state));
   return (
-    <Card title={`Queued requests${openOnes.length ? ` (${openOnes.length} open)` : ""}`}>
-      {v.requests.length === 0 && <p className="text-sm text-[var(--subtle)]">No Queued requests yet. Anything above your Instant budget queues here.</p>}
-      <ul className="flex flex-col gap-2">
-        {openOnes.map((r) => (
-          <RequestRow key={r.id.toString()} v={v} r={r} />
-        ))}
-      </ul>
-      {closed.length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer text-sm text-[var(--subtle)]">Recent closed requests ({closed.length})</summary>
-          <ul className="mt-2 flex flex-col gap-2">
-            {closed.map((r) => (
-              <RequestRow key={r.id.toString()} v={v} r={r} />
-            ))}
-          </ul>
-        </details>
+    <Card title="Queued requests">
+      {v.requests.length === 0 ? (
+        <p className="text-sm text-[var(--subtle)]">No requests yet. Anything above the Instant budget lands here.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {v.requests.map((r) => (
+            <RequestRow key={r.id.toString()} v={v} r={r} />
+          ))}
+        </ul>
       )}
     </Card>
   );

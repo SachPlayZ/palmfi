@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { sepolia } from "viem/chains";
-import { network, wagmiConfig } from "./network";
+import { network } from "./network";
+import { wagmiConfig } from "./wagmi";
 
 describe("network", () => {
-  it("targets Ethereum Sepolia only", () => {
-    expect(wagmiConfig.chains.map((c) => c.id)).toEqual([sepolia.id]);
+  it("targets Arc testnet only", () => {
+    expect(wagmiConfig.chains.map((c) => c.id)).toEqual([5042002]);
   });
 
-  it("exposes shared Sepolia addresses from config, not code", () => {
-    expect(network.tokens.usdc).toBe("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
-    expect(network.ensParent).toBe("palmfi.eth");
+  it("exposes shared Arc addresses from config, not code", () => {
+    expect(network.usdc).toBe("0x3600000000000000000000000000000000000000");
+    expect(network.poolManager).toMatch(/^0x[0-9a-fA-F]{40}$/);
   });
 });

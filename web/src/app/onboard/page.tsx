@@ -8,10 +8,10 @@ export default function OnboardPage() {
       <div>
         <h1 className="text-2xl font-semibold">Create your Vault</h1>
         <p className="text-sm text-[var(--subtle)]">
-          One transaction from your normal wallet: your Vault, your Protected tokens, your Uniswap pool and your name.
+          One transaction: your Vault, your Protected USDC token, its seat in the Orbital pool and your name.
         </p>
       </div>
-      <OnboardForm mode="individual" />
+      <OnboardForm />
     </>
   );
 }

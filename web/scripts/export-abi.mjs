@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const out = join(here, "../../contracts/out");
 const dest = join(here, "../src/abi");
-const contracts = ["Vault", "VaultFactory", "Hub", "ApprovalBook", "NetworkRegistry", "ProtectedToken"];
+const contracts = ["Vault", "VaultFactory", "Hub", "ProtectedToken", "OrbitalHook", "OrbitalRouter"];
 // The Vault forwards unknown selectors to VaultModule (delegatecall), so the app sees both ABIs at the Vault address.
 const merged = { Vault: ["VaultModule"] };
 

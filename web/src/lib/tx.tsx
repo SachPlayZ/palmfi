@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { BaseError, ContractFunctionRevertedError, type Abi, type Address, type Hash } from "viem";
 import { useAccount, useChainId, useConfig, useSwitchChain } from "wagmi";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
-import { sepolia } from "wagmi/chains";
+import { arcTestnet, txUrl } from "./network";
 import { useQueryClient } from "@tanstack/react-query";
 
 /** Loosely typed write params: call sites pick functions dynamically (e.g. by role). */
@@ -33,28 +33,29 @@ export function explainError(e: unknown): string {
 }
 
 const hints: Record<string, string> = {
-  OverBudget: "above the remaining Instant budget, create a Queued request instead",
-  NotHotWallet: "the connected account is not one of this Vault's Hot wallets",
+  OverBudget: "above the remaining Instant budget: queue a request instead",
+  NotWallet: "the connected account is not one of this Vault's wallets",
   NotRecoveryKey: "connect the Recovery key",
-  NotGuardian: "connect the Guardian",
-  NotActive: "the Vault is not active (Frozen, migrated or revoked)",
-  Paused: "the Vault is paused",
+  OutflowsClosed: "the Vault is Frozen (or migrated): outflows are closed",
   Blocklisted: "the destination is on the network Blocklist",
-  BadBond: "a Queued request needs exactly 0.001 ETH bond",
-  TooManyPending: "too many pending Queued requests",
+  TooManyPending: "this wallet already has 3 pending requests",
   NotExecutable: "not executable yet",
-  BadSignature: "the Second factor signature was rejected",
+  NotEligible: "this wallet was added after the request was made, so it can't vote on it",
+  AlreadyVoted: "this wallet already voted",
   TimelockActive: "the timelock hasn't elapsed",
   NameTaken: "that name is taken",
-  BadFee: "onboarding needs exactly 0.001 ETH",
-  DelegateNotApproved: "this Hot wallet's EIP-7702 delegation is not approved",
-  TransferNotAllowed: "Protected tokens only move between this Owner's Hot wallets",
-  Degraded: "the asset is in Degraded Market mode",
-  FeedStale: "the Chainlink price is stale",
+  BadName: "names are lowercase a-z, 0-9 and '-', up to 32 characters",
+  TooFewWallets: "a Vault needs at least 3 wallets",
+  NotTightening: "that would loosen the setting: propose a change instead",
+  DelegateNotApproved: "this wallet's EIP-7702 delegation is not approved",
+  TransferNotAllowed: "Protected tokens only move between this Vault's own wallets and the pool",
   NotFactoryVault: "the payee is not a palmfi Vault",
+  FrozenToken: "one side of this payment is Frozen",
+  InsufficientReserve: "the pool doesn't hold enough of the payee's token right now; try a smaller amount or settle",
+  Slippage: "the price moved past your limit",
 };
 
-/** Sends a contract write on Sepolia, waits for the receipt and refreshes cached reads. */
+/** Sends a contract write on Arc testnet, waits for the receipt and refreshes cached reads. */
 export function useTx() {
   const config = useConfig();
   const chainId = useChainId();
@@ -70,11 +71,11 @@ export function useTx() {
         return false;
       }
       try {
-        if (chainId !== sepolia.id) await switchChainAsync({ chainId: sepolia.id });
+        if (chainId !== arcTestnet.id) await switchChainAsync({ chainId: arcTestnet.id });
         setState({ status: "pending", message: `${label}: confirm in your wallet` });
-        const hash = await writeContract(config, { ...params, chainId: sepolia.id } as Parameters<typeof writeContract>[1]);
-        setState({ status: "mining", hash, message: `${label}: waiting for Sepolia` });
-        const receipt = await waitForTransactionReceipt(config, { hash, chainId: sepolia.id });
+        const hash = await writeContract(config, { ...params, chainId: arcTestnet.id } as Parameters<typeof writeContract>[1]);
+        setState({ status: "mining", hash, message: `${label}: waiting for Arc` });
+        const receipt = await waitForTransactionReceipt(config, { hash, chainId: arcTestnet.id });
         if (receipt.status !== "success") throw new Error(`${label} reverted`);
         setState({ status: "done", hash, message: `${label}: confirmed` });
         await qc.invalidateQueries();
@@ -100,7 +101,7 @@ export function TxStatus({ state }: { state: TxState }) {
       {state.hash && (
         <>
           {" "}
-          <a className="underline" href={`https://sepolia.etherscan.io/tx/${state.hash}`} target="_blank" rel="noreferrer">
+          <a className="underline" href={txUrl(state.hash)} target="_blank" rel="noreferrer">
             view
           </a>
         </>

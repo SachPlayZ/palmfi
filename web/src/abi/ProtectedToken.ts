@@ -124,6 +124,19 @@ export const protectedTokenAbi = [
   },
   {
     "type": "function",
+    "name": "hook",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -138,6 +151,11 @@ export const protectedTokenAbi = [
       },
       {
         "name": "poolManager_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "hook_",
         "type": "address",
         "internalType": "address"
       },

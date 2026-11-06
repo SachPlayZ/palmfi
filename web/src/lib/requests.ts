@@ -1,26 +1,24 @@
-import { FAIL_OPEN_DELAY, REQ, REQ_LABEL, REQUEST_TTL, formatDuration } from "./palm";
+import { REQ, REQ_LABEL, REQUEST_TTL, fastTrackNeeded, formatDuration, vetoNeeded } from "./palm";
 import type { VaultRequest } from "./vault";
 
-export const isOpen = (s: number) => s === REQ.PENDING || s === REQ.CLEARED || s === REQ.HELD;
-
 /** What the request is waiting for, and when it can execute. */
-export function requestTimeline(
-  r: Pick<VaultRequest, "state" | "createdAt" | "executableAt" | "executable" | "secondFactor" | "recoveryApproved">,
-  institution: boolean, floorDelay: number, now: number) {
+export function requestTimeline(r: Pick<VaultRequest, "state" | "createdAt" | "executableAt" | "executable" | "scored" | "fastTracked">, now: number) {
   const created = Number(r.createdAt);
   const expiresIn = created + REQUEST_TTL - now;
-  if (!isOpen(r.state)) return { text: REQ_LABEL[r.state] } as { text: string; expired?: boolean; ready?: boolean; needs2fa?: boolean };
-  if (expiresIn <= 0) return { text: "Expired (7 days): anyone can close it to refund", expired: true };
-  if (r.executable) return { text: "Executable now", ready: true };
-  if (r.state === REQ.PENDING) {
-    if (institution) {
-      const parts = [r.secondFactor ? "Payout approval ✓" : "needs Payout approval", r.recoveryApproved ? "Recovery key ✓" : "needs Recovery key"];
-      const floorIn = created + floorDelay - now;
-      return { text: `Awaiting Verdict. Fail-closed path: ${parts.join(", ")}${floorIn > 0 ? `, Floor in ${formatDuration(floorIn)}` : ""}` };
-    }
-    return { text: `Awaiting Verdict. If CRE stays silent it becomes executable in ${formatDuration(created + FAIL_OPEN_DELAY - now)}` };
-  }
-  if (r.executableAt > 0n) return { text: `Executable in ${formatDuration(Number(r.executableAt) - now)}` };
-  return { text: "Held: confirm with your Second factor or it expires", needs2fa: true };
+  type T = { text: string; expired?: boolean; ready?: boolean };
+  if (r.state !== REQ.PENDING) return { text: REQ_LABEL[r.state] ?? "?" } as T;
+  if (expiresIn <= 0) return { text: "Expired (7 days): anyone can close it to refund the bond", expired: true } as T;
+  if (r.executable) return { text: "Executable now", ready: true } as T;
+  const left = formatDuration(Number(r.executableAt) - now);
+  if (r.fastTracked) return { text: `Fast-tracked by a majority: executable in ${left}` } as T;
+  if (!r.scored) return { text: `Not scored yet: executable in ${left} (MaxDelay) unless the Sentinel shortens it` } as T;
+  return { text: `Delay set by the Sentinel: executable in ${left}` } as T;
 }
 
+/** Vote progress: NOs needed to veto (requester excluded), YESes needed to fast-track. */
+export function voteProgress(r: Pick<VaultRequest, "voterCount" | "yes" | "no">) {
+  return {
+    veto: { have: r.no, need: vetoNeeded(r.voterCount) },
+    fastTrack: { have: r.yes, need: fastTrackNeeded(r.voterCount) },
+  };
+}
