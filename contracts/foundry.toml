@@ -12,7 +12,7 @@ fs_permissions = [
 ]
 
 [rpc_endpoints]
-sepolia = "${SEPOLIA_RPC_URL}"
+arc = "${ARC_RPC_URL}"
 
 [fmt]
 line_length = 120

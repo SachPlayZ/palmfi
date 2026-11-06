@@ -19,7 +19,7 @@ jobs:
       - run: forge build --sizes
       - run: forge test -vv
         env:
-          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}
+          ARC_RPC_URL: ${{ secrets.ARC_RPC_URL || 'https://rpc.testnet.arc.network' }}
 
   cre:
     runs-on: ubuntu-latest
