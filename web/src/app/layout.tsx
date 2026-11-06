@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { Archivo, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Shell } from "@/components/shell";
+
+const display = Archivo({ subsets: ["latin"], axes: ["wdth"], variable: "--font-display" });
+const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono-site" });
 
 export const metadata: Metadata = {
   title: "palmfi",
@@ -10,11 +14,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${serif.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body className="antialiased">
-        <Providers>
-          <Shell>{children}</Shell>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

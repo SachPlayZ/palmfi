@@ -10,7 +10,7 @@ import { arcTestnet } from "@/lib/network";
 import { Notice } from "./ui";
 
 const links = [
-  { href: "/", label: "Vaults" },
+  { href: "/vaults", label: "Vaults" },
   { href: "/onboard", label: "Onboard" },
   { href: "/pay", label: "Pay by name" },
 ];
@@ -22,12 +22,12 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="text-xl font-semibold tracking-tight">
+        <Link href="/vaults" className="text-xl font-semibold tracking-tight">
           palmfi
         </Link>
         <nav className="order-3 flex w-full flex-wrap gap-1 text-sm sm:order-none sm:w-auto">
           {links.map((l) => {
-            const active = l.href === "/" ? path === "/" || path.startsWith("/vault") : path.startsWith(l.href);
+            const active = l.href === "/vaults" ? path.startsWith("/vault") : path.startsWith(l.href);
             return (
               <Link
                 key={l.href}
