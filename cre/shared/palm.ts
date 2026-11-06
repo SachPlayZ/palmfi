@@ -23,6 +23,8 @@ export const REQ_CANCELLED = 6;
 // --- Queued request kinds ---
 export const KIND_UNWRAP = 0;
 export const KIND_PAYMENT = 1;
+/** Pre-cleared Orbital pool swap-in (destination = hook); the swap consumes it. */
+export const KIND_SWAP = 2;
 
 // --- Report types ---
 export const REPORT_SET_DELAY = 0;
