@@ -16,3 +16,6 @@ sepolia = "${SEPOLIA_RPC_URL}"
 
 [fmt]
 line_length = 120
+
+[fuzz]
+runs = 32

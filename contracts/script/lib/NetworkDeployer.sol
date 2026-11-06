@@ -6,7 +6,9 @@ import {Hub} from "../../src/Hub.sol";
 import {NetworkRegistry} from "../../src/NetworkRegistry.sol";
 import {SafetyFund} from "../../src/SafetyFund.sol";
 import {ApprovalBook} from "../../src/ApprovalBook.sol";
+import {SecondFactorVerifier} from "../../src/SecondFactorVerifier.sol";
 import {Vault} from "../../src/Vault.sol";
+import {VaultModule} from "../../src/VaultModule.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
 import {ProtectedToken} from "../../src/tokens/ProtectedToken.sol";
 
@@ -23,6 +25,7 @@ struct Deployment {
     address tokenImpl;
     address ensUserRegistry;
     address ensResolver;
+    bool ensAttached;
 }
 
 struct EnsGrant {
@@ -47,6 +50,8 @@ interface IResolverInit {
 
 interface IEthRegistry {
     function setSubregistry(uint256 anyId, address registry) external;
+    function getResource(uint256 anyId) external view returns (uint256);
+    function hasRoles(uint256 resource, uint256 roleBitmap, address account) external view returns (bool);
 }
 
 /// Single deploy path shared by the Sepolia deploy script and the fork test base,
@@ -57,6 +62,7 @@ abstract contract NetworkDeployer {
     uint256 internal constant ENS_ALL_ROLES = 0x1111111111111111111111111111111111111111111111111111111111111111;
     uint256 internal constant REG_ROLE_REGISTRAR = 1 << 0;
     uint256 internal constant REG_ROLE_UNREGISTER = 1 << 12;
+    uint256 internal constant REG_ROLE_SET_SUBREGISTRY = 1 << 20;
     uint256 internal constant RES_ROLE_SET_ADDRESS = 1 << 0;
 
     function deployNetwork(External memory e, address deployer) internal returns (Deployment memory d) {
@@ -73,7 +79,14 @@ abstract contract NetworkDeployer {
             .deployProxy(
                 e.ensPermissionedResolverImpl, salt + 1, abi.encodeCall(IResolverInit.initialize, (g, new bytes[](0)))
             );
-        IEthRegistry(e.ensEthRegistry).setSubregistry(uint256(keccak256(bytes(PARENT_LABEL))), d.ensUserRegistry);
+        // Needs ROLE_SET_SUBREGISTRY on palmfi.eth (the parent owner, or a deployer it granted). Without it the
+        // network still deploys; the owner then attaches names with one setSubregistry(palmfi, ensUserRegistry).
+        uint256 parentId = uint256(keccak256(bytes(PARENT_LABEL)));
+        IEthRegistry ethReg = IEthRegistry(e.ensEthRegistry);
+        if (ethReg.hasRoles(ethReg.getResource(parentId), REG_ROLE_SET_SUBREGISTRY, deployer)) {
+            ethReg.setSubregistry(parentId, d.ensUserRegistry);
+            d.ensAttached = true;
+        }
 
         // --- network ---
         Hub hub = new Hub(deployer, e.creSimForwarder, d.ensResolver);
@@ -98,6 +111,8 @@ abstract contract NetworkDeployer {
                     registry: d.registry,
                     safetyFund: d.safetyFund,
                     approvalBook: d.approvalBook,
+                    verifier: address(new SecondFactorVerifier()),
+                    vaultModule: address(new VaultModule()),
                     vaultImpl: d.vaultImpl,
                     tokenImpl: d.tokenImpl,
                     poolManager: e.poolManager,

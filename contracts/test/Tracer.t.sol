@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Vault} from "../src/Vault.sol";
+import {VaultBase} from "../src/VaultBase.sol";
 import {PalmTypes} from "../src/libraries/PalmTypes.sol";
 
 interface IFeedLike {
@@ -67,7 +68,7 @@ contract TracerTest is NetworkTest {
         Vault v = onboardAlice();
         depositUsdc(v, hotWallet, 30e6);
         vm.prank(hotWallet);
-        vm.expectPartialRevert(Vault.OverBudget.selector);
+        vm.expectPartialRevert(VaultBase.OverBudget.selector);
         v.unwrap(ext.usdc, 6e6, payee, false);
     }
 
@@ -89,7 +90,7 @@ contract TracerTest is NetworkTest {
         (,,, uint256 updatedAt,) = IFeedLike(ext.usdcUsdFeed).latestRoundData();
         vm.warp(updatedAt + 86400 + 1 hours + 1); // past heartbeat + 1h margin
         vm.prank(hotWallet);
-        vm.expectRevert(abi.encodeWithSelector(Vault.Degraded.selector, ext.usdc));
+        vm.expectRevert(abi.encodeWithSelector(VaultBase.Degraded.selector, ext.usdc));
         v.unwrap(ext.usdc, 1e6, payee, false);
     }
 
@@ -97,7 +98,7 @@ contract TracerTest is NetworkTest {
         Vault v = onboardAlice();
         depositUsdc(v, hotWallet, 30e6);
         vm.prank(attacker);
-        vm.expectRevert(Vault.NotHotWallet.selector);
+        vm.expectRevert(VaultBase.NotHotWallet.selector);
         v.unwrap(ext.usdc, 1e6, attacker, false);
     }
 
@@ -105,12 +106,12 @@ contract TracerTest is NetworkTest {
         Vault v = onboardAlice();
         depositUsdc(v, hotWallet, 30e6);
         vm.startPrank(deployer);
-        vm.expectRevert(Vault.NotHotWallet.selector);
+        vm.expectRevert(VaultBase.NotHotWallet.selector);
         v.unwrap(ext.usdc, 1e6, deployer, false);
-        vm.expectRevert(Vault.NotRecoveryKey.selector);
-        v.migrate();
-        vm.expectRevert(Vault.NotRecoveryKey.selector);
-        v.proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(deployer));
+        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
+        mod(v).migrate();
+        vm.expectRevert(VaultBase.NotRecoveryKey.selector);
+        mod(v).proposeChange(PalmTypes.CHANGE_ADD_HOT_WALLET, abi.encode(deployer));
         vm.stopPrank();
     }
 }

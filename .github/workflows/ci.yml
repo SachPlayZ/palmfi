@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
       - uses: foundry-rs/foundry-toolchain@v1
-      - run: forge build
+      - run: forge build --sizes
       - run: forge test -vv
         env:
           SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com' }}

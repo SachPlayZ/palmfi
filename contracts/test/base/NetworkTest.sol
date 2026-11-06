@@ -6,6 +6,7 @@ import {SepoliaConfig, External} from "../../script/lib/SepoliaConfig.sol";
 import {NetworkDeployer, Deployment} from "../../script/lib/NetworkDeployer.sol";
 import {PalmTypes} from "../../src/libraries/PalmTypes.sol";
 import {Vault} from "../../src/Vault.sol";
+import {VaultModule} from "../../src/VaultModule.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
 import {Hub} from "../../src/Hub.sol";
 import {NetworkRegistry} from "../../src/NetworkRegistry.sol";
@@ -61,9 +62,32 @@ abstract contract NetworkTest is Test, SepoliaConfig, NetworkDeployer {
 
         ext = loadExternal();
         deployer = ext.ensParentOwner; // the deployer owns palmfi.eth
-        vm.startPrank(deployer, deployer);
-        net = deployNetwork(ext, deployer);
-        vm.stopPrank();
+        if (vm.envOr("LIVE", false)) {
+            // LIVE=true: run the suite against the network recorded in deployments/sepolia.json instead of a fresh one.
+            net = loadDeployment();
+            require(net.deployer == deployer, "deployments/sepolia.json not deployed by the palmfi.eth owner");
+            require(block.number >= net.blockNumber, "fork is older than the deployment; set FORK_BLOCK");
+        } else {
+            vm.startPrank(deployer, deployer);
+            net = deployNetwork(ext, deployer);
+            vm.stopPrank();
+        }
+    }
+
+    function loadDeployment() internal view returns (Deployment memory d) {
+        string memory j = vm.readFile("../deployments/sepolia.json");
+        d.deployer = vm.parseJsonAddress(j, ".deployer");
+        d.blockNumber = vm.parseJsonUint(j, ".blockNumber");
+        d.hub = vm.parseJsonAddress(j, ".hub");
+        d.registry = vm.parseJsonAddress(j, ".registry");
+        d.safetyFund = vm.parseJsonAddress(j, ".safetyFund");
+        d.approvalBook = vm.parseJsonAddress(j, ".approvalBook");
+        d.factory = vm.parseJsonAddress(j, ".factory");
+        d.vaultImpl = vm.parseJsonAddress(j, ".vaultImpl");
+        d.tokenImpl = vm.parseJsonAddress(j, ".tokenImpl");
+        d.ensUserRegistry = vm.parseJsonAddress(j, ".ensUserRegistry");
+        d.ensResolver = vm.parseJsonAddress(j, ".ensResolver");
+        d.ensAttached = vm.parseJsonBool(j, ".ensAttached");
     }
 
     uint256 internal constant FEE = 0.001 ether;
@@ -71,6 +95,11 @@ abstract contract NetworkTest is Test, SepoliaConfig, NetworkDeployer {
     address internal recoveryVaultAddr = makeAddr("recoveryVault");
     address internal hotWallet2 = makeAddr("hotWallet2");
     address internal payee = makeAddr("payee");
+
+    /// The Vault address seen through its module ABI (settings, recovery, Safe-harbor, Reconciler views).
+    function mod(Vault v) internal pure returns (VaultModule) {
+        return VaultModule(payable(address(v)));
+    }
 
     function factory() internal view returns (VaultFactory) {
         return VaultFactory(net.factory);
