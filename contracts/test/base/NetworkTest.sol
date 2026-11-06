@@ -6,6 +6,7 @@ import {SepoliaConfig, External} from "../../script/lib/SepoliaConfig.sol";
 import {NetworkDeployer, Deployment} from "../../script/lib/NetworkDeployer.sol";
 import {PalmTypes} from "../../src/libraries/PalmTypes.sol";
 import {Vault} from "../../src/Vault.sol";
+import {VaultModule} from "../../src/VaultModule.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
 import {Hub} from "../../src/Hub.sol";
 import {NetworkRegistry} from "../../src/NetworkRegistry.sol";
@@ -71,6 +72,11 @@ abstract contract NetworkTest is Test, SepoliaConfig, NetworkDeployer {
     address internal recoveryVaultAddr = makeAddr("recoveryVault");
     address internal hotWallet2 = makeAddr("hotWallet2");
     address internal payee = makeAddr("payee");
+
+    /// The Vault address seen through its module ABI (settings, recovery, Safe-harbor, Reconciler views).
+    function mod(Vault v) internal pure returns (VaultModule) {
+        return VaultModule(payable(address(v)));
+    }
 
     function factory() internal view returns (VaultFactory) {
         return VaultFactory(net.factory);

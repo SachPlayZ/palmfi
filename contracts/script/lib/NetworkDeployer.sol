@@ -6,7 +6,9 @@ import {Hub} from "../../src/Hub.sol";
 import {NetworkRegistry} from "../../src/NetworkRegistry.sol";
 import {SafetyFund} from "../../src/SafetyFund.sol";
 import {ApprovalBook} from "../../src/ApprovalBook.sol";
+import {SecondFactorVerifier} from "../../src/SecondFactorVerifier.sol";
 import {Vault} from "../../src/Vault.sol";
+import {VaultModule} from "../../src/VaultModule.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
 import {ProtectedToken} from "../../src/tokens/ProtectedToken.sol";
 
@@ -23,6 +25,7 @@ struct Deployment {
     address tokenImpl;
     address ensUserRegistry;
     address ensResolver;
+    bool ensAttached;
 }
 
 struct EnsGrant {
@@ -73,7 +76,11 @@ abstract contract NetworkDeployer {
             .deployProxy(
                 e.ensPermissionedResolverImpl, salt + 1, abi.encodeCall(IResolverInit.initialize, (g, new bytes[](0)))
             );
-        IEthRegistry(e.ensEthRegistry).setSubregistry(uint256(keccak256(bytes(PARENT_LABEL))), d.ensUserRegistry);
+        // Needs ROLE_SET_SUBREGISTRY on palmfi.eth (the parent owner, or a deployer it granted). Without it the
+        // network still deploys; the owner then attaches names with one setSubregistry(palmfi, ensUserRegistry).
+        try IEthRegistry(e.ensEthRegistry).setSubregistry(uint256(keccak256(bytes(PARENT_LABEL))), d.ensUserRegistry) {
+            d.ensAttached = true;
+        } catch {}
 
         // --- network ---
         Hub hub = new Hub(deployer, e.creSimForwarder, d.ensResolver);
@@ -98,6 +105,8 @@ abstract contract NetworkDeployer {
                     registry: d.registry,
                     safetyFund: d.safetyFund,
                     approvalBook: d.approvalBook,
+                    verifier: address(new SecondFactorVerifier()),
+                    vaultModule: address(new VaultModule()),
                     vaultImpl: d.vaultImpl,
                     tokenImpl: d.tokenImpl,
                     poolManager: e.poolManager,

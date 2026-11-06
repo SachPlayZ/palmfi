@@ -3,6 +3,7 @@ pragma solidity 0.8.29;
 
 import {NetworkTest, IERC20Like} from "./base/NetworkTest.sol";
 import {Vault} from "../src/Vault.sol";
+import {VaultBase} from "../src/VaultBase.sol";
 import {Hub} from "../src/Hub.sol";
 import {PalmTypes as T} from "../src/libraries/PalmTypes.sol";
 
@@ -40,7 +41,7 @@ contract QueuedRequestTest is NetworkTest {
         verdict(v, id, T.VERDICT_CLEAR, 0);
         assertEq(v.getRequest(id).state, T.REQ_CLEARED);
         assertFalse(v.isExecutable(id));
-        vm.expectRevert(Vault.NotExecutable.selector);
+        vm.expectRevert(VaultBase.NotExecutable.selector);
         v.execute(id);
         skip(15 minutes);
         uint256 bondBefore = hotWallet.balance;
@@ -64,7 +65,7 @@ contract QueuedRequestTest is NetworkTest {
     function test_requestExpiresAfterSevenDays() public {
         uint256 id = _request(20e6);
         verdict(v, id, T.VERDICT_HOLD, T.NEW_DESTINATION);
-        vm.expectRevert(Vault.BadState.selector);
+        vm.expectRevert(VaultBase.BadState.selector);
         v.expire(id);
         skip(7 days + 1);
         v.expire(id);
@@ -73,13 +74,13 @@ contract QueuedRequestTest is NetworkTest {
 
     function test_bondAndPendingCapEnforced() public {
         vm.prank(hotWallet);
-        vm.expectRevert(Vault.BadBond.selector);
+        vm.expectRevert(VaultBase.BadBond.selector);
         v.requestUnwrap{value: 0}(ext.usdc, 10e6, payee, false);
         _request(10e6);
         _request(10e6);
         _request(10e6);
         vm.prank(hotWallet);
-        vm.expectRevert(Vault.TooManyPending.selector);
+        vm.expectRevert(VaultBase.TooManyPending.selector);
         v.requestUnwrap{value: BOND}(ext.usdc, 10e6, payee, false);
     }
 
