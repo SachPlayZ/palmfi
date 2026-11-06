@@ -10,7 +10,7 @@ import { VaultHeader } from "./header";
 import { RequestsCard } from "./requests";
 import { SafeHarborCard } from "./safe-harbor";
 import { SendCard } from "./send";
-import { HotWalletsCard, PendingChanges, SettingsCard } from "./settings";
+import { HotWalletsCard, PendingChanges, ProfileCard, SettingsCard } from "./settings";
 import { NetworkPayCard } from "../pay";
 import { useRoles } from "./common";
 
@@ -72,6 +72,7 @@ function DashboardBody({ v }: { v: ReturnType<typeof useVault> }) {
         <SafeHarborCard v={v} />
       </div>
       <SettingsCard v={v} />
+      <ProfileCard v={v} />
       {(roles.isOwner || roles.isHot || roles.isRecovery) && (
         <Card title="Notifications">
           <TelegramLink vault={v.vault!} />

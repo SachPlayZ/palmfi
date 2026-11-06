@@ -4,13 +4,45 @@ import { useState } from "react";
 import { decodeAbiParameters, encodeAbiParameters, isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { useReadContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { vaultAbi } from "@/abi";
+import { vaultAbi, vaultFactoryAbi } from "@/abi";
+import { deployments } from "@/lib/deployments";
 import { CHANGE, CHANGE_LABEL, formatDuration, formatUsd, parseUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultChange, VaultView } from "@/lib/vault";
 import { createPasskey } from "@/lib/webauthn";
 import { Badge, Button, Card, Field, Input, Mono, Notice, Select } from "../ui";
 import { useNow, useRoles } from "./common";
+
+/** ENS profile edits through the factory: only the Owner, only `url` and `avatar`. */
+export function ProfileCard({ v }: { v: VaultView }) {
+  const roles = useRoles(v);
+  const tx = useTx();
+  const [key, setKey] = useState<"url" | "avatar">("url");
+  const [value, setValue] = useState("");
+  if (!roles.isOwner || !v.label || !deployments.factory) return null;
+  return (
+    <Card title="Public profile">
+      <p className="mb-2 text-xs text-[var(--subtle)]">
+        Shown to anyone who types {v.name}. Only you can edit these two records; type, verified, status and tokens are set by palmfi.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Select value={key} onChange={(e) => setKey(e.target.value as "url" | "avatar")}>
+          <option value="url">url</option>
+          <option value="avatar">avatar</option>
+        </Select>
+        <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="https://…" className="flex-1" />
+        <Button
+          variant="secondary"
+          disabled={tx.busy}
+          onClick={() => tx.send({ address: deployments.factory!, abi: vaultFactoryAbi, functionName: "setProfile", args: [v.label, key, value] }, "Update profile")}
+        >
+          Save
+        </Button>
+      </div>
+      <TxStatus state={tx.state} />
+    </Card>
+  );
+}
 
 export function HotWalletsCard({ v }: { v: VaultView }) {
   const roles = useRoles(v);
