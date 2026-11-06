@@ -59,7 +59,7 @@ export function VaultHeader({ v }: { v: VaultView }) {
       </div>
       {v.status === STATUS.FROZEN && (
         <Notice tone="red">
-          <strong>Frozen.</strong> Every outflow and pool swap has stopped; deposits and incoming payments still arrive.{" "}
+          <strong>Frozen.</strong> Outflows have stopped, except Lifeline payments to past counterparties that the recovery key and a majority approve. Deposits still arrive.{" "}
           <Link className="pf-link" href={`/vault/${v.name ?? v.vault}/incident`}>
             See what happened and how to recover
           </Link>

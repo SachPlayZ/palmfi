@@ -188,7 +188,7 @@ const CHAPTERS: { bg: string; fg: string; gl: string; g: GlyphKind; label: strin
     label: "05 · Freeze & recovery",
     title: "Rescue goes to one place.",
     h: "Freeze first, sort it out after.",
-    body: "Any one wallet can freeze the vault. A frozen vault can only unfreeze (by majority or the recovery key) or migrate everything to the recovery vault fixed at onboarding. Changing that address takes seven days.",
+    body: "Any one wallet can freeze the vault. A frozen vault can unfreeze (by majority or the recovery key) or migrate everything to the recovery vault fixed at onboarding, and changing that address takes seven days. Meanwhile the business keeps running: a Lifeline pays counterparties you already paid, approved by the recovery key and a majority, fronted by the Orbital pool and repaid once the freeze ends.",
   },
   {
     bg: "#fbfaf4",
@@ -289,6 +289,11 @@ const FAQS: { cat: string; q: string; a: ReactNode }[] = [
     cat: "Votes",
     q: "Can my team change the rules quickly?",
     a: "Only to tighten them. Lowering the budget, removing a wallet or freezing applies at once. Loosening (adding a wallet, raising the budget, changing limits or recovery) needs a majority and then a 48-hour or 7-day timelock, and a pending loosening makes every payment look more unusual to the Sentinel.",
+  },
+  {
+    cat: "Incidents",
+    q: "Can a frozen vault still pay payroll and suppliers?",
+    a: "Yes, through a Lifeline. Any wallet can propose paying a counterparty the vault already paid before the freeze; it goes through only with both the recovery key and a majority of wallets. The Orbital pool fronts the payment and is repaid from the frozen USDC once the freeze resolves. Lifelines are capped at 20% of the vault's USDC and cost a 0.5% fee.",
   },
   {
     cat: "Incidents",
