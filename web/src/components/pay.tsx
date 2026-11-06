@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { erc20Abi, maxUint256, type Address } from "viem";
 import { useReadContract, useReadContracts } from "wagmi";
@@ -10,6 +11,7 @@ import { KIND, REQ, STATUS, STATUS_LABEL, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { hubAbi } from "@/abi";
+import { OrgCard } from "./brand";
 import { Badge, Button, Card, Field, Input, Mono, Notice, StatusBadge, short } from "./ui";
 import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./vault/common";
 
@@ -36,10 +38,11 @@ function usePayee(vault: Address | undefined) {
 }
 
 /** Pay another org by name through the Orbital pool: exact-out, so the payee receives exactly the amount. */
-export function PoolPayCard({ v }: { v: VaultView }) {
+export function PoolPayCard({ v, initialTo = "", initialAmount = "" }: { v: VaultView; initialTo?: string; initialAmount?: string }) {
   const roles = useRoles(v);
-  const [to, setTo] = useState("");
-  const [amount, setAmount] = useState("");
+  const [to, setTo] = useState(initialTo);
+  const [amount, setAmount] = useState(initialAmount);
+  const [paid, setPaid] = useState<string>();
   const tx = useTx();
   const d = useDestination(to);
   const p = usePayee(d.isVault ? d.address : undefined);
@@ -80,12 +83,14 @@ export function PoolPayCard({ v }: { v: VaultView }) {
       return;
     }
     if (needsApprove) return tx.send({ address: myToken, abi: erc20Abi, functionName: "approve", args: [deployments.router!, maxUint256] }, `Approve ${v.symbol}`);
-    if (await tx.send({ address: deployments.router!, abi: orbitalRouterAbi, functionName: "swap", args: [myToken, p.token, amt, false, maxIn, p.receiver] }, "Pay via Orbital pool"))
+    if (await tx.send({ address: deployments.router!, abi: orbitalRouterAbi, functionName: "swap", args: [myToken, p.token, amt, false, maxIn, p.receiver] }, "Pay via Orbital pool")) {
+      setPaid(tx.state.hash);
       setAmount("");
+    }
   }
 
   return (
-    <Card title="Pay an org by name">
+    <Card label="Orbital pool" title="Pay an org by name">
       {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to pay.</Notice>}
       <div className="mt-2 flex flex-col gap-3">
         <Field
@@ -97,7 +102,8 @@ export function PoolPayCard({ v }: { v: VaultView }) {
           <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="palantir" autoComplete="off" />
         </Field>
         {d.isVault && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] p-2 text-sm">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-[var(--paper-2)] p-3 text-sm" style={{ animation: "pf-fade .5s var(--ease) both" }}>
+            <OrgCard name={d.name || d.address || "?"} width={28} />
             <strong>{d.name || short(d.address)}</strong>
             <StatusBadge status={p.status !== undefined ? STATUS_LABEL[p.status] : undefined} />
             {p.verified ? <Badge tone="blue">verified</Badge> : <Badge tone="amber">unverified</Badge>}
@@ -109,9 +115,9 @@ export function PoolPayCard({ v }: { v: VaultView }) {
         <Field label="Amount they receive (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
-        {quote.error && <p className="text-xs text-red-600 dark:text-red-400">Pool can&apos;t quote this: both orgs need liquidity in the pool, neither may be Frozen, and the pool may be short (try less, or settle).</p>}
+        {quote.error && <p className="text-[13px] text-[var(--red)]">Pool can&apos;t quote this: both orgs need liquidity in the pool, neither may be Frozen, and the pool may be short (try less, or settle).</p>}
         {amountIn !== undefined && (
-          <p className="text-sm">
+          <p className="rounded-2xl bg-[var(--paper-2)] p-3 text-sm">
             You pay <span className="tabular font-medium">{fmtAmount(amountIn)} {v.symbol}</span> ({formatUsd(amountIn - (amt ?? 0n))} pool spread)
             {overBudget && <span className="block text-xs text-amber-700 dark:text-amber-400">Over the Instant budget: queue a payment from Send instead.</span>}
             {v.creLive && (
@@ -125,6 +131,11 @@ export function PoolPayCard({ v }: { v: VaultView }) {
           {needsClearance ? (waiting ? "Waiting for clearance…" : "Request clearance") : needsApprove ? `Approve ${v.symbol}` : "Pay via Orbital pool"}
         </Button>
         <TxStatus state={tx.state} />
+        {tx.state.status === "done" && (paid ?? tx.state.hash) && tx.state.message?.startsWith("Pay via") && (
+          <Link className="pf-btn line sm w-fit" href={`/pay/${paid ?? tx.state.hash}`}>
+            View receipt →
+          </Link>
+        )}
       </div>
     </Card>
   );
@@ -149,7 +160,7 @@ export function LiquidityCard({ v }: { v: VaultView }) {
   const hook = (functionName: string, args: unknown[], label: string) => tx.send({ address: deployments.hook!, abi: orbitalHookAbi, functionName, args }, label);
 
   return (
-    <Card title="Orbital pool liquidity">
+    <Card label="Orbital pool" title="Your liquidity">
       <p className="text-sm">
         You provided <span className="tabular font-medium">{fmtAmount(v.poolLiquidity)} {v.symbol}</span>; the pool holds <span className="tabular">{fmtAmount(v.poolReserve)}</span>.
       </p>

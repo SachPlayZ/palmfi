@@ -97,18 +97,14 @@ export function useTx() {
 
 export function TxStatus({ state }: { state: TxState }) {
   if (state.status === "idle" || !state.message) return null;
-  const color =
-    state.status === "error" ? "text-red-600 dark:text-red-400" : state.status === "done" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--subtle)]";
   return (
-    <p className={`mt-2 text-xs ${color}`} role="status" aria-live="polite">
-      {state.message}
+    <p className={`pf-tx ${state.status}`} role="status" aria-live="polite">
+      <span className="dot" aria-hidden />
+      <span className="min-w-0">{state.message}</span>
       {state.hash && (
-        <>
-          {" "}
-          <a className="underline" href={txUrl(state.hash)} target="_blank" rel="noreferrer">
-            view
-          </a>
-        </>
+        <a href={txUrl(state.hash)} target="_blank" rel="noreferrer">
+          view
+        </a>
       )}
     </p>
   );

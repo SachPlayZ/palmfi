@@ -35,7 +35,7 @@ export function SendCard({ v }: { v: VaultView }) {
   }
 
   return (
-    <Card title="Send">
+    <Card label="Send" title="Unwrap or pay a vault">
       {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to spend.</Notice>}
       <div className="mt-2 flex flex-col gap-3">
         <Field label="Amount (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>

@@ -1,9 +1,7 @@
-"use client";
+import { IncidentTab } from "@/components/vault/tabs";
 
-import { use } from "react";
-import { IncidentView } from "@/components/vault/incident";
+export const metadata = { title: "Incident" };
 
-export default function IncidentPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  return <IncidentView id={id} />;
+export default function VaultIncidentPage() {
+  return <IncidentTab />;
 }

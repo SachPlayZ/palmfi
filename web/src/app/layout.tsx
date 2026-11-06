@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Archivo, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import "./brand.css";
 import { Providers } from "./providers";
 
 const display = Archivo({ subsets: ["latin"], axes: ["wdth"], variable: "--font-display" });
@@ -8,7 +9,7 @@ const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["nor
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono-site" });
 
 export const metadata: Metadata = {
-  title: "palmfi",
+  title: { default: "palmfi", template: "%s · palmfi" },
   description: "Protected vaults: your keys can be stolen, your money can't leave faster than you can say no.",
 };
 

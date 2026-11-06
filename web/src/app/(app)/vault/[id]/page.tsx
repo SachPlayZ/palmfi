@@ -1,9 +1,5 @@
-"use client";
+import { OverviewTab } from "@/components/vault/tabs";
 
-import { use } from "react";
-import { Dashboard } from "@/components/vault/dashboard";
-
-export default function VaultPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  return <Dashboard id={id} />;
+export default function VaultOverviewPage() {
+  return <OverviewTab />;
 }

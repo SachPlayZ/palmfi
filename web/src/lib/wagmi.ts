@@ -21,6 +21,7 @@ const connectors = connectorsForWallets(
 export const wagmiConfig = createConfig({
   connectors,
   chains: [arcTestnet],
-  transports: { [arcTestnet.id]: http(process.env.NEXT_PUBLIC_ARC_RPC_URL || arcTestnet.rpcUrls.default.http[0]) },
+  // Batch concurrent reads into one JSON-RPC request: the public Arc endpoint rate-limits bursts.
+  transports: { [arcTestnet.id]: http(process.env.NEXT_PUBLIC_ARC_RPC_URL || arcTestnet.rpcUrls.default.http[0], { batch: { wait: 16 } }) },
   ssr: true,
 });

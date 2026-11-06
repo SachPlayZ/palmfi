@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { encodeAbiParameters, parseAbiItem } from "viem";
 import { vaultAbi } from "@/abi";
 import { deployments } from "@/lib/deployments";
@@ -11,8 +10,6 @@ import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { Badge, Button, Card, Mono, Notice, short } from "../ui";
 import { useRoles } from "./common";
-import { VaultGate } from "./dashboard";
-import { VaultHeader } from "./header";
 import { PendingChanges } from "./settings";
 
 const frozenEv = parseAbiItem("event Frozen(address indexed vault, address by, uint256 reasonCodes)");
@@ -34,7 +31,7 @@ function ReasonList({ bitmap }: { bitmap: bigint }) {
   );
 }
 
-function IncidentBody({ v }: { v: VaultView }) {
+export function IncidentBody({ v }: { v: VaultView }) {
   const roles = useRoles(v);
   const tx = useTx();
   const frozen = useEventLogs("frozen", { address: deployments.hub, event: frozenEv, args: { vault: v.vault } });
@@ -47,18 +44,14 @@ function IncidentBody({ v }: { v: VaultView }) {
 
   return (
     <>
-      <VaultHeader v={v} />
-      <Link href={`/vault/${v.vault}`} className="text-sm underline">
-        ← Back to dashboard
-      </Link>
       {!isFrozen && <Notice tone="green">Not frozen. Outflows are open.</Notice>}
 
-      <Card title="What happened" tone={isFrozen ? "danger" : undefined}>
+      <Card label="Incident" title="What happened" tone={isFrozen ? "danger" : undefined}>
         {frozen.isLoading && <p className="text-sm text-[var(--subtle)]">Reading Hub events…</p>}
         {frozen.data?.length === 0 && <p className="text-sm text-[var(--subtle)]">This Vault has never been frozen.</p>}
         <ul className="flex flex-col gap-3">
           {frozen.data?.map((l) => (
-            <li key={`${l.transactionHash}-${l.logIndex}`} className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-3">
+            <li key={`${l.transactionHash}-${l.logIndex}`} className="flex flex-col gap-1 rounded-2xl bg-[var(--paper-2)] p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
                   Frozen by <Mono>{short(l.args.by)}</Mono> {l.args.by?.toLowerCase() === deployments.hub?.toLowerCase() ? "(Sentinel FLAG)" : ""}
@@ -78,7 +71,7 @@ function IncidentBody({ v }: { v: VaultView }) {
               {flagged.data.map((l) => {
                 const r = flaggedReqs.find((x) => x.id === l.args.requestId);
                 return (
-                  <li key={`${l.transactionHash}-${l.logIndex}`} className="rounded-lg border border-red-500/40 p-2 text-sm">
+                  <li key={`${l.transactionHash}-${l.logIndex}`} className="rounded-2xl bg-[#fcebe7] p-3 text-sm">
                     #{l.args.requestId?.toString()} {r && formatUsd(r.amount)} → <Mono>{short(l.args.destination)}</Mono> (destination blocklisted network-wide)
                     <ReasonList bitmap={l.args.reasonCodes ?? 0n} />
                   </li>
@@ -91,7 +84,7 @@ function IncidentBody({ v }: { v: VaultView }) {
       </Card>
 
       {isFrozen && (
-        <Card title="Recovery options">
+        <Card label="Recovery" title="Your options">
           <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm">
             <li>
               A majority of wallets votes <strong>Unfreeze</strong> (applies at once). Use this when the alarm was false.
@@ -131,8 +124,4 @@ function IncidentBody({ v }: { v: VaultView }) {
       )}
     </>
   );
-}
-
-export function IncidentView({ id }: { id: string }) {
-  return <VaultGate id={id}>{(v) => <IncidentBody v={v} />}</VaultGate>;
 }

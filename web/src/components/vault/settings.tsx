@@ -46,13 +46,13 @@ export function WalletsCard({ v }: { v: VaultView }) {
   const propose = (kind: number, a: Address, label: string) =>
     tx.send({ address: v.vault!, abi: vaultAbi, functionName: "proposeChange", args: [kind, encodeAbiParameters(addr, [a])] }, label);
   return (
-    <Card title="Wallets (Voters)">
+    <Card label="Voters" title="Wallets, one vote each">
       <ul className="flex flex-col gap-2">
         {s.wallets.map((w, i) => {
           const target = del.data?.[1]?.[i];
           const ok = del.data?.[2]?.[i];
           return (
-            <li key={w} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-2">
+            <li key={w} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[var(--paper-2)] p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Mono>{w}</Mono>
                 {i === 0 && <Badge tone="blue">receives payments</Badge>}
@@ -100,7 +100,7 @@ function ChangeRow({ v, c }: { v: VaultView; c: VaultChange }) {
   const ready = passed && !c.done && now >= Number(c.eta);
   const send = (functionName: string, label: string) => tx.send({ address: v.vault!, abi: vaultAbi, functionName, args: [c.id] }, label);
   return (
-    <li className="flex flex-col gap-1 rounded-lg border border-[var(--border)] p-2 text-sm">
+    <li className="flex flex-col gap-1 rounded-2xl bg-[var(--paper-2)] p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
           <span className="text-xs text-[var(--subtle)]">#{c.id.toString()}</span> <strong>{CHANGE_LABEL[c.kind]}</strong> {describe(c)}
@@ -175,7 +175,7 @@ export function SettingsCard({ v }: { v: VaultView }) {
   const instant = (kind === CHANGE.BUDGET && tighterBudget) || (kind === CHANGE.LIMITS && tighterLimits);
 
   return (
-    <Card title="Settings">
+    <Card label="Settings" title="Tighten now, loosen by vote">
       <PendingChanges v={v} />
       {roles.isWallet && (
         <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
@@ -235,7 +235,7 @@ export function FreezeCard({ v }: { v: VaultView }) {
   const tx = useTx();
   if (!roles.isWallet) return null;
   return (
-    <Card title="Emergency" tone="danger">
+    <Card label="Emergency" title="Freeze the vault" tone="danger">
       <Notice tone="red">Saw something you didn&apos;t do? Freeze stops every outflow and pool swap at once. Unfreezing needs a majority of wallets or the Recovery key.</Notice>
       <Button className="mt-3" variant="danger" disabled={tx.busy} onClick={() => tx.send({ address: v.vault!, abi: vaultAbi, functionName: "freeze" }, "Freeze")}>
         Freeze Vault
