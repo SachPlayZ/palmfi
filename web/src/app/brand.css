@@ -255,3 +255,6 @@ a.pf-row:hover, button.pf-row:hover { background: linear-gradient(90deg, #faf8ea
 /* step transitions (onboarding, flows) */
 @keyframes pf-slide-r { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: none; } }
 @keyframes pf-slide-l { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: none; } }
+/* Modal content isn't watched by the scroll reveal: show it at once, without card chrome. */
+.pf-modal-body [data-pf] { opacity: 1; transform: none; }
+.pf-modal-body .pf-card { border: 0; box-shadow: none; }

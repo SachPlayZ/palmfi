@@ -1,6 +1,7 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
 /** Card in the landing's language: white, thin rule, mono label header. */
 export function Card({
@@ -101,5 +102,42 @@ export function Notice({ tone = "gray", children }: { tone?: "gray" | "red" | "a
       <i aria-hidden />
       <div className="min-w-0">{children}</div>
     </div>
+  );
+}
+
+/** Centered dialog (bottom sheet on phones). Esc or a backdrop click closes it. */
+export function Modal({ open, onClose, title, label, children }: { open: boolean; onClose: () => void; title: string; label?: string; children: ReactNode }) {
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", esc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", esc);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-[rgba(20,32,24,0.45)] backdrop-blur-[3px]" style={{ animation: "pf-fade .25s ease both" }} onClick={onClose} />
+      <div
+        className="relative flex max-h-[92vh] w-full max-w-[560px] flex-col overflow-hidden rounded-t-[22px] bg-white shadow-[0_40px_80px_-30px_rgba(20,32,24,0.5)] sm:rounded-[22px]"
+        style={{ animation: "pf-pop .35s var(--ease) both" }}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-6 pt-5 pb-4">
+          <div className="flex flex-col gap-1">
+            {label && <span className="pf-mono pf-dim">{label}</span>}
+            <h2 className="pf-h3">{title}</h2>
+          </div>
+          <button type="button" className="pf-btn ghost sm" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </header>
+        <div className="overflow-y-auto p-2 pf-modal-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }

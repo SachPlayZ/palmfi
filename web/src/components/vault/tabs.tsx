@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { erc20Abi, formatUnits } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { ago, useVaultActivity, type Activity } from "@/lib/activity";
@@ -11,7 +11,8 @@ import { CHANGE_LABEL, REQ, REQ_LABEL, STATUS_LABEL, decodeReasonCodes, formatBi
 import { LiquidityCard, PoolPayCard } from "../pay";
 import { TelegramLink } from "../telegram-link";
 import { CopyButton, EmptyState, Glyph, Skeleton, useOrigin } from "../brand";
-import { Card, Notice } from "../ui";
+import { Card, Modal, Notice } from "../ui";
+import { ReceiveTab } from "./receive";
 import { BalancesCard, BudgetCard, DepositCard } from "./balances";
 import { useRoles } from "./common";
 import { useV, useVaultBase } from "./frame";
@@ -48,10 +49,7 @@ export function OverviewTab() {
         <BudgetCard v={v} />
         <BalancesCard v={v} />
       </div>
-      <div className="pf-grid2">
-        <DepositCard v={v} />
-        <RecentActivity />
-      </div>
+      <RecentActivity />
       {!roles.isWallet && (
         <p className="text-[13px] text-[var(--subtle)]">You&apos;re viewing as a guest. Connect one of this vault&apos;s wallets to act.</p>
       )}
@@ -62,7 +60,9 @@ export function OverviewTab() {
 /** The vault's money, read live from Arc: USDC held by the Vault contract, and what the viewer can do with it. */
 function BalanceHero() {
   const v = useV();
-  const base = useVaultBase();
+  const [open, setOpen] = useState<"deposit" | "send" | "receive" | null>(null);
+  const [sendMode, setSendMode] = useState<"name" | "direct">("name");
+  const close = useCallback(() => setOpen(null), []);
   const { address } = useAccount();
   const roles = useRoles(v);
   const walletUsdc = useReadContract({
@@ -95,15 +95,15 @@ function BalanceHero() {
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a href="#deposit" className="pf-btn dark">
+          <button type="button" className="pf-btn dark" onClick={() => setOpen("deposit")}>
             Deposit
-          </a>
-          <Link href={`${base}/send`} className="pf-btn line">
+          </button>
+          <button type="button" className="pf-btn line" onClick={() => setOpen("send")}>
             Send
-          </Link>
-          <Link href={`${base}/receive`} className="pf-btn line">
+          </button>
+          <button type="button" className="pf-btn line" onClick={() => setOpen("receive")}>
             Receive
-          </Link>
+          </button>
         </div>
       </div>
       <dl className="grid grid-cols-2 border-t border-[var(--line)] bg-[var(--paper-2)] sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]" style={{ "--n": stats.length } as React.CSSProperties}>
@@ -115,6 +115,34 @@ function BalanceHero() {
           </div>
         ))}
       </dl>
+      <Modal open={open === "deposit"} onClose={close} title="Deposit USDC">
+        <DepositCard v={v} />
+      </Modal>
+      <Modal open={open === "send"} onClose={close} title="Send">
+        <div className="mx-4 mt-3 grid grid-cols-2 gap-1 rounded-full bg-[var(--paper-2)] p-1 text-[14px]">
+          {(
+            [
+              ["name", "Pay a vault by name"],
+              ["direct", "Withdraw to an address"],
+            ] as const
+          ).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              className={`rounded-full px-4 py-2 transition-colors ${sendMode === k ? "bg-white shadow-sm" : "text-[var(--subtle)]"}`}
+              onClick={() => setSendMode(k)}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {sendMode === "name" ? <PoolPayCard v={v} /> : <SendCard v={v} />}
+      </Modal>
+      <Modal open={open === "receive"} onClose={close} title="Receive">
+        <div className="flex flex-col [&_.pf-grid2]:!grid-cols-1">
+          <ReceiveTab />
+        </div>
+      </Modal>
     </section>
   );
 }

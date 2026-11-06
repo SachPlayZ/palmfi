@@ -19,7 +19,7 @@ export function BalancesCard({ v }: { v: VaultView }) {
   return (
     <Card label="Protected USDC" title={v.symbol} actions={<Badge tone={backed ? "green" : "red"}>{backed ? "fully backed" : "reserve short"}</Badge>}>
       <div className="flex items-baseline gap-3">
-        <span className="pf-big">{fmtAmount(v.totalTokens, 6, 2)}</span>
+        <span className="pf-big">{formatUsd(v.totalTokens)}</span>
         <span className="pf-mono pf-dim">{v.symbol} · 1:1 USDC</span>
       </div>
       <ul className="mt-6 flex flex-col gap-3">
@@ -48,22 +48,33 @@ export function BalancesCard({ v }: { v: VaultView }) {
 export function BudgetCard({ v }: { v: VaultView }) {
   const s = v.s;
   if (!s) return null;
-  const avail = s.availableBudget;
+  const left = s.availableBudget;
   const cap = s.budget24h < s.budget7d ? s.budget24h : s.budget7d;
-  const frac = cap > 0n ? Number((avail * 1000n) / cap) / 1000 : 0;
+  // What can actually leave right now: budget left, but never more than the vault's wallets hold.
+  const now = left < v.totalTokens ? left : v.totalTokens;
+  const frac = cap > 0n ? Number((left * 1000n) / cap) / 1000 : 0;
   return (
     <Card label="Instant budget" title="Spend now, no wait">
       <div className="flex items-center gap-6">
         <Ring value={frac} size={104} color="var(--moss)">
-          <span className="pf-mono">{Math.round(frac * 100)}%</span>
+          <span className="flex flex-col items-center leading-tight">
+            <span className="pf-mono">{Math.round(frac * 100)}%</span>
+            <span className="text-[10px] text-[var(--subtle)]">limit left</span>
+          </span>
         </Ring>
         <div className="flex flex-col gap-1">
-          <span className="pf-big">{formatUsd(avail)}</span>
-          <span className="pf-mono pf-dim">available now · refills over 24h / 7d</span>
+          <span className="pf-big">{formatUsd(now)}</span>
+          <span className="pf-mono pf-dim">
+            {v.totalTokens === 0n ? "deposit USDC to start spending" : `spendable now · ${formatUsd(left)} of limit left`}
+          </span>
         </div>
       </div>
       <dl className="pf-kv mt-6 border-t border-[var(--line)] pt-4">
-        <dt>24h / 7d budget</dt>
+        <dt>Held by your wallets</dt>
+        <dd className="tabular">{formatUsd(v.totalTokens)}</dd>
+        <dt>Limit left (24h window)</dt>
+        <dd className="tabular">{formatUsd(left)}</dd>
+        <dt>24h / 7d limit</dt>
         <dd className="tabular">
           {formatUsd(s.budget24h)} / {formatUsd(s.budget7d)}
         </dd>
@@ -72,10 +83,6 @@ export function BudgetCard({ v }: { v: VaultView }) {
         <dt>Floor · Cap delay · Max delay</dt>
         <dd className="tabular">
           {formatDuration(s.floorDelay)} · {formatDuration(s.capDelay)} · {formatDuration(s.maxDelay)}
-        </dd>
-        <dt>Business hours</dt>
-        <dd className="tabular">
-          {s.bizStartHourUtc}:00–{s.bizEndHourUtc}:00 UTC
         </dd>
       </dl>
     </Card>
