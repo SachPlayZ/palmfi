@@ -5,11 +5,25 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PalmTypes as T} from "./libraries/PalmTypes.sol";
 import {ProtectedToken} from "./tokens/ProtectedToken.sol";
 import {VaultBase} from "./VaultBase.sol";
+import {IVault} from "./interfaces/IPalm.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+/// The Orbital hook as a Frozen Vault's Lifeline sees it (ADR-0013).
+interface ILifelineHook {
+    function lifelineDraw(address payeeVault, uint256 amount, uint256 fee) external;
+}
 
 /// Settings changes by majority vote (instant tightening by any one wallet, timelocked loosening), recovery, and the
 /// Sentinel/Reconciler views. Runs only via delegatecall from a Vault (same storage layout through VaultBase), so the
 /// Vault stays under EIP-170.
 contract VaultModule is VaultBase {
+    using SafeERC20 for IERC20;
+
+    event LifelineProposed(uint256 indexed id, address indexed payee, address proposer, uint256 amount, uint256 fee);
+    event LifelineApproved(uint256 indexed id, address by, uint16 yes, bool keyApproved);
+    event LifelineDrawn(uint256 indexed id, address indexed payee, uint256 amount, uint256 fee);
+    event LifelineCancelled(uint256 indexed id);
+    event LifelineRepaid(address indexed payee, uint256 principal, uint256 fee);
     // ------------------------------------------------------------------
     // Tightening: instant, any one wallet
     // ------------------------------------------------------------------
@@ -148,6 +162,108 @@ contract VaultModule is VaultBase {
     function recoveryMigrate() external {
         if (msg.sender != recoveryKey || recoveryKey == address(0)) revert NotRecoveryKey();
         _migrate();
+    }
+
+    // ------------------------------------------------------------------
+    // Lifeline (ADR-0013): keep paying known counterparties while Frozen
+    // ------------------------------------------------------------------
+
+    /// Any wallet proposes paying `amount` to a payee Vault this Vault already paid before the freeze (its
+    /// history or onboarding destinations: the vote never chooses where money goes, ADR-0004/0008). The amount
+    /// plus fee is escrowed by burning the proposer's tokens; the frozen USDC itself does not move.
+    function proposeLifeline(address payeeVault, uint256 amount) external onlyWallet returns (uint256 id) {
+        if (hub.statusOf(address(this)) != T.STATUS_FROZEN) revert NotFrozen();
+        if (recoveryKey == address(0)) revert NotRecoveryKey();
+        if (amount == 0) revert ZeroAmount();
+        if (!factory.isVault(payeeVault) || payeeVault == address(this)) revert NotFactoryVault();
+        if (destinationCount[payeeVault] == 0 && !isDestination[payeeVault]) revert UnknownPayee(payeeVault);
+        uint256 fee = amount * LIFELINE_FEE_BPS / 10_000;
+        uint256 room = lifelineRoom();
+        if (amount + fee > room) revert OverLifelineCap(amount + fee, room);
+
+        ProtectedToken(token).burn(msg.sender, amount + fee);
+        lifelinePending += amount + fee;
+        id = ++nextLifelineId;
+        Lifeline storage l = _lifelines[id];
+        l.payee = payeeVault;
+        l.proposer = msg.sender;
+        l.amount = uint128(amount);
+        l.fee = uint128(fee);
+        l.createdAt = uint64(block.timestamp);
+        l.voterCount = uint16(_wallets.length);
+        l.state = 1;
+        emit LifelineProposed(id, payeeVault, msg.sender, amount, fee);
+        _approveLifeline(id, l);
+    }
+
+    /// Needs both the Recovery key (which a hot-wallet compromise doesn't reach) and a majority of the wallets.
+    function approveLifeline(uint256 id) external {
+        Lifeline storage l = _lifelines[id];
+        if (l.state != 1) revert BadState();
+        _approveLifeline(id, l);
+    }
+
+    function _approveLifeline(uint256 id, Lifeline storage l) internal {
+        if (msg.sender == recoveryKey) {
+            if (l.keyApproved) revert AlreadyVoted();
+            l.keyApproved = true;
+        } else {
+            _checkWallet(msg.sender);
+            if (walletAddedAt[msg.sender] > l.createdAt) revert NotEligible();
+            if (hasVotedLifeline[id][msg.sender]) revert AlreadyVoted();
+            hasVotedLifeline[id][msg.sender] = true;
+            l.yes++;
+        }
+        emit LifelineApproved(id, msg.sender, l.yes, l.keyApproved);
+        if (!l.keyApproved || !_majority(l.yes, l.voterCount)) return;
+        // Still frozen: once unfrozen the ordinary queued lane applies; once migrated nothing more leaves.
+        if (hub.statusOf(address(this)) != T.STATUS_FROZEN) revert NotFrozen();
+        uint256 owed = uint256(l.amount) + l.fee;
+        l.state = 2;
+        lifelinePending -= owed;
+        lifelineDebt += owed;
+        _record(l.proposer, l.payee, l.amount);
+        hub.emitOutflow(l.proposer, l.payee, l.amount, true);
+        ILifelineHook(factory.hook()).lifelineDraw(l.payee, l.amount, l.fee);
+        emit LifelineDrawn(id, l.payee, l.amount, l.fee);
+    }
+
+    /// The proposer, or anyone after REQUEST_TTL. The escrow comes back unless the Vault migrated (its USDC went
+    /// to the Recovery vault, so re-minting would be unbacked).
+    function cancelLifeline(uint256 id) external {
+        Lifeline storage l = _lifelines[id];
+        if (l.state != 1) revert BadState();
+        if (msg.sender != l.proposer && block.timestamp <= l.createdAt + REQUEST_TTL) revert Unauthorized();
+        uint256 owed = uint256(l.amount) + l.fee;
+        l.state = 3;
+        lifelinePending -= owed;
+        if (hub.statusOf(address(this)) != T.STATUS_MIGRATED) {
+            ProtectedToken(token).mint(isWallet[l.proposer] ? l.proposer : _wallets[0], owed);
+        }
+        emit LifelineCancelled(id);
+    }
+
+    /// Hook-only repayment once the freeze resolved (unfrozen, or migrated with the debt kept back): principal
+    /// and fee in USDC to the payee Vault, which mints the fee to its wallets (the principal the hook mints back
+    /// into the pool).
+    function repayLifeline(uint256 principal, uint256 fee, address payeeVault) external onlyHook {
+        uint8 s = hub.statusOf(address(this));
+        if (s != T.STATUS_ACTIVE && s != T.STATUS_MIGRATED) revert NotActive();
+        lifelineDebt -= principal + fee;
+        IERC20(usdc).safeTransfer(payeeVault, principal + fee);
+        if (fee != 0) IVault(payeeVault).receivePayment(fee);
+        emit LifelineRepaid(payeeVault, principal, fee);
+    }
+
+    /// How much more (amount + fee) Lifelines may still take.
+    function lifelineRoom() public view returns (uint256) {
+        uint256 cap = IERC20(usdc).balanceOf(address(this)) * LIFELINE_CAP_BPS / 10_000;
+        uint256 used = lifelinePending + lifelineDebt;
+        return cap > used ? cap - used : 0;
+    }
+
+    function getLifeline(uint256 id) external view returns (Lifeline memory) {
+        return _lifelines[id];
     }
 
     // ------------------------------------------------------------------
