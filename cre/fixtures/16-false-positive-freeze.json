@@ -1,0 +1,10 @@
+{
+  "row": "False-positive freeze",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "A Frozen Vault: nothing is re-flagged or scored until the Recovery key unfreezes it.",
+  "expect": "\"health\":[]",
+  "unitTest": "sentinel/failure-matrix.test.ts row 16",
+  "enabled": false
+}

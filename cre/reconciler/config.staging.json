@@ -1,0 +1,39 @@
+{
+  "schedule": "0 */1 * * * *",
+  "chainSelectorName": "ethereum-testnet-sepolia",
+  "chainId": 11155111,
+  "hub": "0xe259e2435E589b96150A1ebEb32f7DD766C05A06",
+  "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+  "reportTtlSeconds": 900,
+  "gasLimit": "1500000",
+  "maxWritesPerRun": 8,
+  "maxScorePerRun": 10,
+  "vaultPageSize": 50,
+  "volatileMoveBps": 1000,
+  "assets": [
+    {
+      "name": "WETH",
+      "underlying": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      "feed": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "heartbeat": 3600,
+      "pool": {
+        "stateView": "0xE1Dd9c3fA50EDB962E442f60DfBc432e24537E4C",
+        "poolId": "",
+        "quote": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        "quoteDecimals": 6,
+        "quoteFeed": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
+        "baseDecimals": 18
+      }
+    },
+    {
+      "name": "USDC",
+      "underlying": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "feed": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
+      "heartbeat": 86400
+    }
+  ],
+  "notify": {
+    "url": "",
+    "apiKeySecret": "notifyApiKey"
+  }
+}

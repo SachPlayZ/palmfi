@@ -1,0 +1,10 @@
+{
+  "row": "7702 sweeper delegation",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "A Hot wallet delegated with `cast send --auth` to a sweeper contract.",
+  "expect": "DELEGATION_FLAG WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 12",
+  "enabled": false
+}

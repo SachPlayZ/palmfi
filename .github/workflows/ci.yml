@@ -25,13 +25,20 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: cre/hello
+        working-directory: cre
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      # One bun workspace (cre/package.json): hello, shared (palm constants + decision engine),
+      # sentinel and reconciler. Typecheck and test every package.
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
-      - run: bun test
+      - run: bun run test
+      # Compile the Sentinel and Reconciler to WASM exactly as `cre workflow simulate` does
+      # (cre-compile runs the SDK's runtime-compat and determinism checks).
+      - run: bun run build
 
   web:
     runs-on: ubuntu-latest

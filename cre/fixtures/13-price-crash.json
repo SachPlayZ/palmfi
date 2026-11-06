@@ -1,0 +1,10 @@
+{
+  "row": "Price crash",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "A mock ETH/USD feed whose latest round is -15% against the previous one (demo scene 4).",
+  "expect": "WETH 0->1 WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 13",
+  "enabled": false
+}
