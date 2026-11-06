@@ -303,10 +303,10 @@ function lanePath(i: number) {
 }
 
 const CAPS = [
-  { k: "The drain", t: "One valid signature. One transaction. $2.5B gone." },
-  { k: "The gate", t: "A palmfi vault puts a gate where a signature can't reach." },
+  { k: "The risk", t: "Today, one valid signature can move an entire treasury." },
+  { k: "The vault", t: "palmfi puts a gate where a signature alone can't reach." },
   { k: "The lanes", t: "Past the gate, every payment takes a lane." },
-  { k: "The brake", t: "A stolen key only buys the budget. The rest waits for your team." },
+  { k: "The brake", t: "A compromised key only reaches the budget. The rest waits for your team." },
 ];
 
 function Hero() {
@@ -332,7 +332,7 @@ function Hero() {
             ))}
           </g>
           <text className="m-flow-note" x="960" y="40" textAnchor="end" style={{ opacity: clamp((p - 0.1) * 8) * (1 - clamp((p - 0.3) * 8)) }}>
-            $2.5B · ONE TRANSACTION · NO WAY TO SAY NO
+            ONE SIGNATURE · ONE TRANSACTION · NO WAY TO SAY NO
           </text>
           <g className="m-flow-lanes">
             {Array.from({ length: NL }, (_, i) => {
@@ -387,7 +387,7 @@ function Statement() {
   return (
     <section className="m-state">
       <div data-r>
-        <span className="mono dim">(000) palmfi — protected USDC vaults on Arc</span>
+        <span className="mono dim">Protected USDC treasury for teams</span>
         <h1 className="m-h1 serif">
           <Words text="Your keys can be stolen." />
           <em>
@@ -435,16 +435,16 @@ function Facts() {
   return (
     <section className="m-facts">
       <div className="m-sec-head" data-r>
-        <span className="mono">(001) 29 October 2026</span>
+        <span className="mono">Why palmfi</span>
         <p className="m-lede">
-          Attackers never stole Binance&rsquo;s keys. They got its signing system to sign for them. The threat to design for is <em className="serif">&ldquo;the attacker can produce valid signatures.&rdquo;</em>
+          Keys leak. Signers get phished. Signing systems get tricked. palmfi is built for the day someone else <em className="serif">can produce valid signatures</em> for your treasury, and still can&rsquo;t take it.
         </p>
       </div>
       <div className="m-facts-row">
         {[
-          { v: <Counter to={6.3} prefix="$" suffix="B" decimals={1} />, l: "left hot wallets in under an hour" },
-          { v: <Counter to={50} />, l: "pre-signed EIP-7702 authorizations in one transaction" },
-          { v: <Counter to={20} suffix=" min" />, l: "to swap $325M into ETH, ahead of any freeze" },
+          { v: <Counter to={15} suffix=" min" />, l: "minimum hold on any payout above budget" },
+          { v: <Counter to={1} />, l: "wallet is all it takes to freeze the vault" },
+          { v: <Counter to={7} suffix=" days" />, l: "to change where rescued funds can go" },
         ].map((f, i) => (
           <div key={i} className="m-fact" data-r style={{ "--d": `${i * 0.12}s` } as CSSProperties}>
             <i className="m-rule" />
@@ -601,7 +601,7 @@ function Deck() {
     <section className="m-deck-sec" id="lanes" ref={ref}>
       <div className="m-deck-pin">
         <div className="m-deck-head">
-          <span className="mono">(002) How a vault spends</span>
+          <span className="mono">How a vault spends</span>
           <span className="mono dim tabular">
             0{i + 1} / 0{N}
           </span>
@@ -684,7 +684,7 @@ function Try() {
   return (
     <section className="m-try" id="try">
       <div className="m-sec-head" data-r>
-        <span className="mono">(003) Try a payout</span>
+        <span className="mono">Try a payout</span>
         <h2 className="m-h2 serif">
           <Words text="Drag the amount." /> <em><Words text="Watch the vault decide." base={0.2} /></em>
         </h2>
@@ -798,7 +798,7 @@ function Sentinel() {
         <div className="m-sent-card">
           <GlyphArt g="ladder" />
           <div className="m-sent-caption">
-            <span className="mono">(004) Sentinel</span>
+            <span className="mono">Sentinel</span>
             <h2 className="serif">Every request, scored before it leaves.</h2>
             <p>One shared Chainlink CRE workflow scores every outflow against that wallet&rsquo;s and that vault&rsquo;s own history, with pure integer math. The more surprising a request, the longer it waits. Past the threshold it flags: the vault freezes and the destination lands on the shared blocklist.</p>
           </div>
@@ -872,7 +872,7 @@ function Asymmetry() {
   return (
     <section className="m-asym" id="config">
       <div className="m-sec-head" data-r>
-        <span className="mono">(005) Config is asymmetric</span>
+        <span className="mono">Settings</span>
         <div>
           <h2 className="m-h2 serif">
             <Words text="Tighten in a click." /> <em><Words text="Loosen in days." base={0.2} /></em>
@@ -970,7 +970,7 @@ function Network() {
   return (
     <section className="m-net" id="network">
       <span className="mono m-net-k" data-r>
-        (006) Paying other orgs
+        Paying other orgs
       </span>
       <Orbit />
       <p className="m-net-q serif" data-r>
@@ -1012,7 +1012,7 @@ function Pieces() {
   return (
     <section className="m-pieces" id="pieces">
       <div className="m-sec-head" data-r>
-        <span className="mono">(007) Protocol</span>
+        <span className="mono">Protocol</span>
         <h2 className="m-h2 serif">
           <Words text="Six pieces." /> <em><Words text="Your team holds every rule." base={0.15} /></em>
         </h2>
@@ -1066,7 +1066,7 @@ function Footer() {
             <Mark />
             <span>palmfi</span>
           </Link>
-          <p>Protected USDC vaults on Arc. Built at ETHGlobal Mumbai, November 2026.</p>
+          <p>Protected USDC vaults for teams. Instant everyday payments, brakes on everything else.</p>
         </div>
         <div className="m-foot-cols">
           <div>
