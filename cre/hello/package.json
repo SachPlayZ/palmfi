@@ -1,0 +1,16 @@
+{
+  "name": "palmfi-cre-hello",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@chainlink/cre-sdk": "^1.23.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
