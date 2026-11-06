@@ -4,7 +4,8 @@ import { approvalBookAbi, hubAbi, hubEventsAbi, vaultAbi } from "./abi";
 
 const src = async (p: string) => Bun.file(`${import.meta.dir}/../../contracts/src/${p}`).text();
 const HUB = await src("Hub.sol");
-const VAULT = await src("Vault.sol");
+// The Vault address serves Vault.sol, its VaultBase storage and (via delegatecall) VaultModule.sol.
+const VAULT = (await Promise.all(["Vault.sol", "VaultBase.sol", "VaultModule.sol"].map(src))).join("\n");
 const BOOK = await src("ApprovalBook.sol");
 
 /** Canonical parameter types of a Solidity parameter list: drop names, `indexed`, data locations. */

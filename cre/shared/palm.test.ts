@@ -3,7 +3,8 @@ import * as P from "./palm";
 
 // node:fs is typed `never` by the SDK (WASM has no fs), so read through Bun.
 const SOL = await Bun.file(`${import.meta.dir}/../../contracts/src/libraries/PalmTypes.sol`).text();
-const VAULT = await Bun.file(`${import.meta.dir}/../../contracts/src/Vault.sol`).text();
+// Vault constants live in VaultBase.sol since the EIP-170 split.
+const VAULT = await Bun.file(`${import.meta.dir}/../../contracts/src/VaultBase.sol`).text();
 
 /** Every `uintN internal constant NAME = VALUE;` in PalmTypes.sol, with `1 << n` evaluated. */
 const solConstants = (): Map<string, bigint> => {
