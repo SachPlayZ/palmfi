@@ -1,0 +1,11 @@
+{
+  "name": "palmfi-cre",
+  "private": true,
+  "license": "UNLICENSED",
+  "workspaces": ["hello", "shared", "sentinel", "reconciler"],
+  "scripts": {
+    "typecheck": "for p in hello shared; do (cd $p && bun run typecheck) || exit 1; done",
+    "test": "for p in hello shared; do (cd $p && bun test) || exit 1; done",
+    "simulate": "bash scripts/simulate.sh"
+  }
+}

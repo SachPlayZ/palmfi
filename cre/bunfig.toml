@@ -1,0 +1,4 @@
+[install]
+# Each workflow gets its own node_modules (with .bin/cre-compile) symlinked into one store, which is what
+# `cre workflow simulate` expects when it runs `bun cre-compile` inside the workflow folder.
+linker = "isolated"
