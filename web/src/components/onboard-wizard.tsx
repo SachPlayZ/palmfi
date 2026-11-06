@@ -640,45 +640,53 @@ function Success({ name, vault }: { name: string; vault: Address }) {
   const join = `${useOrigin()}/join/${name}`;
   const steps = [
     { t: "Deposit USDC", d: "Mint your token 1:1.", href: `/vault/${name}/send` },
-    { t: "Invite your voters", d: "Send each wallet owner the join link.", copy: join },
-    { t: "Link your alerts", d: "Get Telegram messages for long delays and flags.", tg: true },
+    { t: "Invite your voters", d: "Share the join link with each wallet owner.", copy: join },
+    { t: "Link your alerts", d: "Telegram pings for reviews and flags.", tg: true },
   ];
   return (
-    <div className="flex flex-col gap-8">
-      <HillsBand className="px-6 pt-14 pb-[min(26vw,280px)] text-center">
-        <span className="mx-auto mb-6 block w-fit" style={{ animation: "pf-pop 1s var(--ease) both" }}>
-          <OrgCard name={name} width={120} tilt />
-        </span>
-        <h1 className="pf-h1">
-          <em>{name}</em> is live.
-        </h1>
-        <p className="mx-auto mt-4 max-w-[48ch] text-[16px] text-[var(--ink-2)]">
-          Your vault, your {name}USDC token, a seat in the Orbital pool and your name, all in one transaction.
-        </p>
-        <div className="mt-6 flex justify-center gap-2">
-          <Link className="pf-btn dark" href={`/vault/${name}`}>
+    <div className="flex flex-col">
+      <HillsBand className="!rounded-none px-6 pt-6 pb-16 sm:px-8">
+        <div className="flex items-center gap-4">
+          <span style={{ animation: "pf-pop .8s var(--ease) both" }}>
+            <OrgCard name={name} width={64} tilt />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="pf-mono pf-dim">Vault created</span>
+            <h2 className="pf-serif truncate text-[34px] leading-none tracking-[-0.02em]">
+              <em className="text-[var(--leaf)]">{name}</em> is live.
+            </h2>
+          </div>
+        </div>
+      </HillsBand>
+      <div className="flex flex-col gap-4 px-6 py-5 sm:px-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link className="pf-btn dark sm" href={`/vault/${name}`}>
             Open dashboard
           </Link>
           <AddressChip address={vault} />
         </div>
-      </HillsBand>
-      <div className="pf-grid3">
-        {steps.map((s, i) => (
-          <div key={s.t} className="pf-card flex flex-col gap-3" style={{ animation: `pf-fade .7s var(--ease) ${0.3 + i * 0.08}s both` }}>
-            <span className="pf-mono pf-dim">Next · {String(i + 1).padStart(2, "0")}</span>
-            <h3 className="pf-h3">{s.t}</h3>
-            <p className="text-[14px] text-[var(--subtle)]">{s.d}</p>
-            <div className="mt-auto pt-2">
-              {s.href && (
-                <Link className="pf-btn line sm" href={s.href}>
-                  Go →
-                </Link>
-              )}
-              {s.copy && <CopyButton text={s.copy} label="Copy join link" className="sm" />}
-              {s.tg && <TelegramLink vault={vault} />}
-            </div>
-          </div>
-        ))}
+        <ul className="flex flex-col divide-y divide-[var(--line)] rounded-2xl border border-[var(--line)]">
+          {steps.map((s, i) => (
+            <li key={s.t} className="flex items-center justify-between gap-4 px-4 py-3" style={{ animation: `pf-fade .5s var(--ease) ${0.15 + i * 0.06}s both` }}>
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="pf-mono pf-dim w-5">{String(i + 1).padStart(2, "0")}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[14.5px] font-medium">{s.t}</span>
+                  <span className="truncate text-[13px] text-[var(--subtle)]">{s.d}</span>
+                </span>
+              </span>
+              <span className="shrink-0">
+                {s.href && (
+                  <Link className="pf-btn line sm" href={s.href}>
+                    Go →
+                  </Link>
+                )}
+                {s.copy && <CopyButton text={s.copy} label="Copy link" className="sm" />}
+                {s.tg && <TelegramLink vault={vault} />}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
