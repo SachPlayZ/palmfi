@@ -41,6 +41,7 @@ contract VaultFactory {
     mapping(address => bool) public isVault;
 
     event VaultCreated(address indexed vault, string name, address token);
+    event PoolSeat(address indexed vault, bool seated);
 
     error NotAdmin();
     error AlreadySet();
@@ -63,7 +64,22 @@ contract VaultFactory {
         hook = hook_;
     }
 
+    /// Onboards a Vault with a seat in the Orbital pool (the default).
     function createVault(string calldata name, T.VaultConfig calldata cfg) external returns (address v) {
+        return _create(name, cfg, true);
+    }
+
+    /// Onboards a Vault, choosing whether its token takes a seat in the Orbital pool. A Vault without a seat
+    /// is the same as one onboarded into a full pool: it holds, unwraps and pays addresses, but can't pay or be
+    /// paid by name through the pool.
+    function createVaultWithPool(string calldata name, T.VaultConfig calldata cfg, bool joinPool)
+        external
+        returns (address v)
+    {
+        return _create(name, cfg, joinPool);
+    }
+
+    function _create(string calldata name, T.VaultConfig calldata cfg, bool joinPool) internal returns (address v) {
         if (cfg.recoveryVault == address(0) || cfg.floorDelay == 0 || cfg.floorDelay > cfg.capDelay) {
             revert BadConfig();
         }
@@ -79,8 +95,9 @@ contract VaultFactory {
         Vault(v).initialize(cfg, w);
         isVault[v] = true;
         IHubFactory(hub).registerVault(v, name, t);
-        if (hook != address(0)) IOrbitalHookRegistry(hook).registerToken(v);
+        if (joinPool && hook != address(0)) IOrbitalHookRegistry(hook).registerToken(v);
         emit VaultCreated(v, name, t);
+        emit PoolSeat(v, joinPool && hook != address(0));
     }
 
     function defaultDelegates() external view returns (address[] memory) {

@@ -81,6 +81,24 @@ contract OrbitalTest is NetworkTest {
         assertGt(hook.radius(), 0);
     }
 
+    function test_optOut_noPoolSeat() public {
+        address[] memory q = new address[](3);
+        for (uint256 i; i < 3; i++) q[i] = makeAddr(string.concat("quiet", vm.toString(i)));
+        Vault quiet = Vault(factory().createVaultWithPool("quiet", config(q), false));
+        assertEq(hook.tokenCount(), 3); // no new seat
+        assertEq(hook.vaultOf(quiet.token()), address(0));
+        assertEq(hub().resolve("quiet"), address(quiet)); // still named and onboarded
+
+        Vault seated = Vault(factory().createVaultWithPool("seated", config(_addrs("seated")), true));
+        assertEq(hook.tokenCount(), 4);
+        assertEq(hook.vaultOf(seated.token()), address(seated));
+    }
+
+    function _addrs(string memory tag) internal returns (address[] memory a) {
+        a = new address[](3);
+        for (uint256 i; i < 3; i++) a[i] = makeAddr(string.concat(tag, vm.toString(i)));
+    }
+
     function test_paymentByName_palantirPaysNvidia() public {
         address to = Vault(hub().resolve("nvidia")).wallets()[1];
         uint256 budget = palantir.availableBudget();
