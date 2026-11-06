@@ -16,12 +16,7 @@
   "feeds": {
     "ethUsd": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
     "usdcUsd": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
-    "linkUsd": "0xc59E3633BAAC79493d908e63626716e204A45EdF",
-    "heartbeats": {
-      "ethUsd": 3600,
-      "usdcUsd": 86400,
-      "linkUsd": 3600
-    }
+    "linkUsd": "0xc59E3633BAAC79493d908e63626716e204A45EdF"
   },
   "ens": {
     "parentLabel": "palmfi",
@@ -42,5 +37,10 @@
   },
   "network": {
     "voteWindowSeconds": 300
+  },
+  "feedHeartbeats": {
+    "ethUsd": 3600,
+    "usdcUsd": 86400,
+    "linkUsd": 3600
   }
 }

@@ -59,8 +59,8 @@ abstract contract SepoliaConfig is CommonBase {
         e.creSimForwarder = vm.parseJsonAddress(j, ".cre.simForwarder");
         e.creForwarder = vm.parseJsonAddress(j, ".cre.forwarder");
         e.metamaskDelegator = vm.parseJsonAddress(j, ".delegates.metamaskEip7702StatelessDeleGator");
-        e.ethUsdHeartbeat = uint32(vm.parseJsonUint(j, ".feeds.heartbeats.ethUsd"));
-        e.usdcUsdHeartbeat = uint32(vm.parseJsonUint(j, ".feeds.heartbeats.usdcUsd"));
+        e.ethUsdHeartbeat = uint32(vm.parseJsonUint(j, ".feedHeartbeats.ethUsd"));
+        e.usdcUsdHeartbeat = uint32(vm.parseJsonUint(j, ".feedHeartbeats.usdcUsd"));
         e.voteWindow = vm.parseJsonUint(j, ".network.voteWindowSeconds");
     }
 }
