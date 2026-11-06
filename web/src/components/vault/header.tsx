@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { STATUS, STATUS_LABEL, formatDuration } from "@/lib/palm";
+import { STATUS, formatDuration } from "@/lib/palm";
 import type { VaultView } from "@/lib/vault";
 import { AddressChip, OrgCard, Words, useNow } from "../brand";
-import { Badge, Notice, StatusBadge } from "../ui";
+import { Badge, Notice } from "../ui";
 import { useRoles } from "./common";
 
 export function VaultHeader({ v }: { v: VaultView }) {
   const now = useNow(5000);
   const roles = useRoles(v);
-  const status = v.status !== undefined ? STATUS_LABEL[v.status] : undefined;
   const hb = v.lastHeartbeat ? now - Number(v.lastHeartbeat) : undefined;
-  const role = roles.isRecovery ? "recovery key" : roles.isWallet ? "voter" : undefined;
   const name = v.name ?? "vault";
   return (
     <div className="flex flex-col gap-5">
@@ -22,11 +20,11 @@ export function VaultHeader({ v }: { v: VaultView }) {
             <OrgCard name={name} width={88} tilt />
           </span>
           <div className="flex min-w-0 flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2" style={{ animation: "pf-fade .7s var(--ease) .1s both" }}>
-              <StatusBadge status={status} />
-              {v.verified && <Badge tone="blue">verified</Badge>}
-              {role && <Badge tone="forest">you: {role}</Badge>}
-            </div>
+            {v.verified && (
+              <div style={{ animation: "pf-fade .7s var(--ease) .1s both" }}>
+                <Badge tone="blue">verified</Badge>
+              </div>
+            )}
             <h1 className="pf-h1 break-words">
               <Words text={name} />
             </h1>
