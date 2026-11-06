@@ -1,21 +1,6 @@
-import "./landing.css";
-import { HeatTrail } from "@/components/site/fx";
-import { Drift, Footer, Hero, HoldToSign, Nav, Network, Poster, States } from "@/components/site/landing";
+import "./meadow.css";
+import { Meadow } from "@/components/site/meadow";
 
-export default function Landing() {
-  return (
-    <div className="site">
-      <HeatTrail />
-      <Nav />
-      <main>
-        <Hero />
-        <Poster />
-        <States />
-        <Drift />
-        <HoldToSign />
-        <Network />
-      </main>
-      <Footer />
-    </div>
-  );
+export default function Page() {
+  return <Meadow />;
 }
