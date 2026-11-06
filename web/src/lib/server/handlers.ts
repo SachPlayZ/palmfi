@@ -226,15 +226,16 @@ export async function processTelegramUpdate(update: TelegramUpdate, deps: Deps):
 }
 
 /**
- * GET /api/telegram/status?vault=0x…: how many Telegram chats are linked to the Vault. Without a webhook
- * (local dev: TELEGRAM_WEBHOOK_SECRET unset) it first drains the bot's getUpdates queue, so `/start` still links.
+ * GET /api/telegram/status?vault=0x…: how many Telegram chats are linked to the Vault. When the bot has no
+ * webhook (local dev) it first drains the bot's getUpdates queue, so `/start` still links.
  */
 export async function handleTelegramStatus(req: Request, deps: Deps, poll?: () => Promise<TelegramUpdate[]>): Promise<Response> {
   const vault = new URL(req.url).searchParams.get("vault") ?? "";
   if (!isAddress(vault)) return json(400, { ok: false, error: "vault must be an address" });
   const botToken = botTokenOf(deps.env);
   if (!botToken || !deps.kv) return json(503, { ok: false, error: "Telegram bot not configured" });
-  if (!deps.env.TELEGRAM_WEBHOOK_SECRET && poll) {
+  // getUpdates fails (409) while a webhook is set, so polling is a no-op in production and live locally.
+  if (poll) {
     for (const u of await poll().catch(() => [])) await processTelegramUpdate(u, deps);
   }
   const chats = parseChats(await deps.kv.get(chatKey(getAddress(vault))));
