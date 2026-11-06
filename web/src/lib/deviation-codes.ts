@@ -7,3 +7,4 @@ export const CONFIG_CHANGE_PENDING = 1n << 4n;
 export const NEW_WALLET = 1n << 5n;
 export const BLOCKLISTED_DEST = 1n << 6n;
 export const OVER_HARD_CAP = 1n << 9n;
+export const CRE_SILENT = 1n << 10n;

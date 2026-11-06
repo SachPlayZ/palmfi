@@ -8,7 +8,7 @@
  * Pure and integer-only (bigint fixed point, milli-bits): every DON node must reach the same bytes.
  * Everything is measured at the request's own createdAt, so a late re-score (Reconciler) gives the same answer.
  */
-import { BLOCKLISTED_DEST, CONFIG_CHANGE_PENDING, NEW_DESTINATION, NEW_WALLET, OFF_HOURS, OVER_HARD_CAP, UNUSUAL_AMOUNT, VELOCITY } from "./deviation-codes";
+import { BLOCKLISTED_DEST, CONFIG_CHANGE_PENDING, CRE_SILENT, NEW_DESTINATION, NEW_WALLET, OFF_HOURS, OVER_HARD_CAP, UNUSUAL_AMOUNT, VELOCITY } from "./deviation-codes";
 
 type Hex = `0x${string}`;
 
@@ -254,7 +254,7 @@ export const assess = (ctx: ScoringContext, params: Params = DEFAULT_PARAMS): As
   );
   const win = walletS.total > vaultS.total ? { s: walletS, name: "wallet" as const } : { s: vaultS, name: "vault" as const };
   const total = win.s.total > U32_MAX ? U32_MAX : win.s.total;
-  let codes = r.reasonCodes | win.s.codes;
+  let codes = (r.reasonCodes & ~CRE_SILENT) | win.s.codes; // scored now: no longer silent
   if (p.hardCap > 0n && r.amount > p.hardCap) codes |= OVER_HARD_CAP;
 
   const flag = total >= BigInt(params.sFlag) || (codes & BLOCKLISTED_DEST) !== 0n;

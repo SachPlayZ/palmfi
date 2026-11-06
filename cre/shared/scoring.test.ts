@@ -58,11 +58,12 @@ describe("scoreAndWrite", () => {
     expect(w.notifications).toHaveLength(0);
   });
 
-  test("CRE_SILENT from the Vault is kept in the written codes", () => {
+  test("a scored request drops CRE_SILENT but keeps the Vault's other codes", () => {
     const w = newWorld();
-    addVault(w, ADDR.alice, fakeVault()).requests.set(1n, request());
+    addVault(w, ADDR.alice, fakeVault()).requests.set(1n, request({ reasonCodes: P.CRE_SILENT | P.OVER_HARD_CAP }));
     run(w, [{ vault: ADDR.alice, requestId: 1n }]);
-    expect(w.writes[0].reasonCodes & P.CRE_SILENT).toBe(P.CRE_SILENT);
+    expect(w.writes[0].reasonCodes & P.CRE_SILENT).toBe(0n);
+    expect(w.writes[0].reasonCodes & P.OVER_HARD_CAP).toBe(P.OVER_HARD_CAP);
   });
 
   test("huge 2am request to a new destination → FLAG and every Voter is notified", () => {
