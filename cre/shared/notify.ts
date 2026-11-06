@@ -1,15 +1,16 @@
 /**
- * Owner notifications (issue #8): the web app's /notify endpoint, called over Confidential HTTP so the API
+ * Voter notifications (issue #8): the web app's /notify endpoint, called over Confidential HTTP so the API
  * key is injected from Vault DON secrets inside the enclave and never appears in workflow memory.
+ * The endpoint fans out to every Voter of the Vault (Vault.wallets()), so a hacked requester can't mute it.
  *
- * Endpoint contract: POST {vault, kind: "HOLD"|"FLAG"|"CONFIG_CHANGE", requestId, reasonCodes}
- * with header `x-api-key`. requestId and reasonCodes are decimal strings (uint256 does not fit a JSON number).
- * The endpoint must be idempotent: CRE may retry.
+ * Endpoint contract: POST {vault, kind: "DELAY"|"FLAG"|"CONFIG_CHANGE", requestId, reasonCodes, score, delay}
+ * with header `x-api-key`. Integers are decimal strings (uint256 does not fit a JSON number); score is
+ * milli-bits, delay seconds. The endpoint must be idempotent: CRE may retry.
  */
 import { ConfidentialHTTPClient, type Runtime } from "@chainlink/cre-sdk";
 import type { Address } from "viem";
 
-export type NotifyKind = "HOLD" | "FLAG" | "CONFIG_CHANGE";
+export type NotifyKind = "DELAY" | "FLAG" | "CONFIG_CHANGE";
 
 export type NotifyConfig = {
   /** Full URL of the /notify endpoint; empty disables notifications. */
@@ -20,7 +21,14 @@ export type NotifyConfig = {
   secretOwner?: string;
 };
 
-export type NotifyMessage = { vault: Address; kind: NotifyKind; requestId: bigint; reasonCodes: bigint };
+export type NotifyMessage = {
+  vault: Address;
+  kind: NotifyKind;
+  requestId: bigint;
+  reasonCodes: bigint;
+  score?: number;
+  delay?: bigint;
+};
 
 export const notifyBody = (m: NotifyMessage): string =>
   JSON.stringify({
@@ -28,9 +36,11 @@ export const notifyBody = (m: NotifyMessage): string =>
     kind: m.kind,
     requestId: m.requestId.toString(),
     reasonCodes: m.reasonCodes.toString(),
+    score: String(m.score ?? 0),
+    delay: (m.delay ?? 0n).toString(),
   });
 
-/** Sends one notification. Never throws: a failed notification must not undo a written Verdict. */
+/** Sends one notification. Never throws: a failed notification must not undo a written report. */
 export function notify(runtime: Runtime<unknown>, cfg: NotifyConfig, m: NotifyMessage): { ok: boolean; status?: number } {
   if (!cfg.url) return { ok: false };
   try {

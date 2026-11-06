@@ -1,0 +1,10 @@
+{
+  "row": "Baseline poisoning",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "A large request after a few planted outliers still carries UNUSUAL_AMOUNT (robust median/MAD; history learns only executed outflows).",
+  "expect": "UNUSUAL_AMOUNT",
+  "unitTest": "sentinel/failure-matrix.test.ts row 5",
+  "enabled": false
+}

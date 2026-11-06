@@ -1,7 +1,7 @@
 /**
  * Vault-level checks that freeze without any request (issues #11, #12): reserves below supply →
- * RESERVE_FLAG, a Hot wallet delegated (EIP-7702) to an unapproved target → DELEGATION_FLAG.
- * The Hub's onReport freezes the Vault, flips ENS status and emits Flagged; we only write and notify.
+ * RESERVE_FLAG, a wallet delegated (EIP-7702) to an unapproved target → DELEGATION_FLAG.
+ * The Hub's onReport freezes the Vault and emits Flagged; we only write and notify every Voter.
  */
 import type { Runtime } from "@chainlink/cre-sdk";
 import type { Address } from "viem";
@@ -10,7 +10,14 @@ import type { Chain } from "./chain";
 import { notify } from "./notify";
 import * as P from "./palm";
 import { deriveNonce, writeReport, type WriteResult } from "./report";
-import { delegationsOk, reservesOk, type ScoringConfig } from "./scoring";
+import type { ScoringConfig } from "./scoring";
+
+/** Every wallet's EIP-7702 delegation is either none or an approved delegate. */
+export const delegationsOk = (d: readonly [readonly Address[], readonly Address[], readonly boolean[]] | undefined) =>
+  d === undefined ? undefined : d[2].every(Boolean);
+
+/** USDC held covers the Protected token supply (ADR-0006). */
+export const reservesOk = (r: readonly [bigint, bigint] | undefined) => (r === undefined ? undefined : r[0] >= r[1]);
 
 export type HealthFinding = {
   vault: Address;
@@ -63,7 +70,8 @@ export function flagVaults(
       vault: f.vault,
       requestId: 0n,
       requestHash: ZERO32,
-      verdict: P.VERDICT_FLAG,
+      delay: 0n,
+      score: 0,
       reasonCodes: f.reasonCodes,
       expiry: opts.blockTimestamp + BigInt(cfg.reportTtlSeconds),
       nonce: deriveNonce(opts.nonceSeed, f.vault.toLowerCase(), f.reportType),

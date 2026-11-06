@@ -1,0 +1,10 @@
+{
+  "row": "Missed log / dropped execution",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "An unscored Pending request exists and the Sentinel never saw its log (e.g. Sentinel paused).",
+  "expect": "DELAY WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 2",
+  "enabled": false
+}

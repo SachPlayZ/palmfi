@@ -2,17 +2,20 @@
 import type { EVMLog } from "@chainlink/cre-sdk";
 import { encodeAbiParameters, encodeEventTopics, hexToBytes, type Address, type Hex } from "viem";
 import { hubEventsAbi } from "../shared/abi";
-import { ADDR, request } from "../shared/testing";
+import { DEFAULT_PARAMS } from "../shared/deviation";
+import { ADDR, type Req } from "../shared/testing";
 import type { Config, SCORED_EVENTS } from "./main";
 
 export const config: Config = {
-  chainSelectorName: "ethereum-testnet-sepolia",
-  chainId: 11155111,
+  chainSelectorName: "arc-testnet",
+  chainId: 5042002,
   hub: ADDR.hub,
   multicall3: ADDR.multicall3,
   reportTtlSeconds: 900,
   gasLimit: "1500000",
   maxWritesPerRun: 5,
+  scoring: DEFAULT_PARAMS,
+  notifyDelaySeconds: 6 * 3600,
   notify: { url: "https://palmfi.example/api/notify", apiKeySecret: "notifyApiKey" },
 };
 
@@ -38,19 +41,24 @@ export function hubLog(eventName: EventName, args: Record<string, unknown>, opts
   } as unknown as EVMLog;
 }
 
-export const unwrapLog = (vault: Address, r: ReturnType<typeof request>, id = 1n, opts = {}) =>
+export const queuedLog = (vault: Address, r: Req, id = 1n, opts = {}) =>
   hubLog(
-    "UnwrapRequested",
+    "RequestQueued",
     {
       vault,
       requestId: id,
       requestHash: r.requestHash,
-      asset: r.asset,
+      kind: r.kind,
+      wallet: r.requester,
       amount: r.amount,
       destination: r.destination,
-      usdValue: r.usdValue,
       reasonCodes: r.reasonCodes,
     },
     opts,
   );
 
+export const configLog = (vault: Address, kind: number, eta = 0n, changeId = 1n) =>
+  hubLog("ConfigChange", { vault, changeId, kind, data: "0x", yesVotes: 1, eta });
+
+export const outflowLog = (vault: Address, viaPool: boolean) =>
+  hubLog("Outflow", { vault, wallet: ADDR.w0, destination: ADDR.friend, amount: 1_000000n, viaPool });

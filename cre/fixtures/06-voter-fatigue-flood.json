@@ -1,0 +1,10 @@
+{
+  "row": "Voter fatigue flood",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "Many small requests plus one large one: the large one is scored first; pending cap + bond onchain.",
+  "expect": "DELAY WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 6",
+  "enabled": false
+}

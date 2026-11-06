@@ -1,0 +1,10 @@
+{
+  "row": "Replay / modified request",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "Replay a RequestQueued tx whose request was since closed: the report is skipped or rejected onchain (nonce / requestHash).",
+  "expect": "SKIP_",
+  "unitTest": "sentinel/failure-matrix.test.ts row 3",
+  "enabled": false
+}

@@ -137,8 +137,8 @@ Unchanged from v1: the vault refuses callers whose 7702 delegation target isn't 
 | Floor | 15 min (demo: 60s) |
 | MaxDelay (CRE silent) | 72h |
 | CapDelay / Hard cap | 24h / $5k (Individual), $250k (org) |
-| `k` (bits per doubling) | 2 |
-| `S_flag` | 24 bits |
+| `k` (bits per doubling) | 2.5 (routine ≈ 3 bits → ~35 min) |
+| `S_flag` | 28 bits (sentinel config `scoring.sFlag`) |
 | Pending per wallet | 3 |
 | Loosening timelock | 48h; Recovery change 7d |
 
@@ -165,17 +165,17 @@ Unchanged from v1: the vault refuses callers whose 7702 delegation target isn't 
 | `S_velocity` | Poisson tail of 1h / 24h count and sum vs rate λ | `−log2 P(X ≥ x)` |
 | `S_flags` | `CONFIG_CHANGE_PENDING`, `NEW_WALLET` (whitelisted < 7d) | fixed adds |
 
-- **Baseline lives onchain** in the vault as compact stats (EWMA of log-amount and abs-deviation, 24× hour counts, per-destination counts, λ). Updated **only on executed, un-vetoed requests**, so a vetoed attack never teaches the model.
-- **Drift cap:** each update moves the median/MAD by ≤ x%/day, which blocks boiling-frog baseline poisoning.
+- **Baseline lives onchain** in the vault as a 32-entry ring buffer of executed outflows `{wallet, destination, amount, timestamp}` plus per-destination counts. Written **only on executed, un-vetoed outflows**, so a vetoed attack never teaches the model.
+- **Robust stats + relative terms:** median / MAD (floor ±√2×) for amount; time and velocity are measured relative to the usual hour / a lone request, so routine payroll scores ≈ 0–3 bits. A few planted outliers can't move a median of 32 (boiling-frog poisoning needs > 16 executed, un-vetoed outflows).
 - **Cold start:** the coarse profile set at onboarding (hours, usual max payout, known destinations; ADR-0007) seeds the baseline as pseudo-counts.
-- **Explainable:** the report carries per-term bits + reason bitmap; the UI shows "+9 bits: new destination, +6 bits: 3am".
+- **Explainable:** the report carries the total score + reason bitmap; the per-term bits are recomputed by the same pure function (`cre/shared/deviation.ts`) for notifications and the UI; the UI shows "+9 bits: new destination, +6 bits: 3am".
 - **Quota fit:** one batched view returns baseline + request (≤ 15 EVM reads); pure math, no HTTP except notify.
 
 ### 7.3 Workflows (ADR-0003: ≤ 3 per CRE org)
 
 | Workflow | Trigger | Job |
 |---|---|---|
-| **Sentinel** | Hub logs `RequestQueued`, `ConfigChangeRequested`, `PoolSwap` | Score → `SET_DELAY` or `FLAG`; on FLAG: freeze, blocklist, notify all voters |
+| **Sentinel** | Hub logs `RequestQueued`, `ConfigChange`, `Outflow` (viaPool) | Score → `SET_DELAY` or `FLAG`; on FLAG: freeze, blocklist, notify all voters |
 | **Reconciler** | Cron 1–2 min | Score anything missed; reserves ≥ supply; delegation checks; heartbeat; **Orbital settlement** (§8.4) |
 
 ### 7.4 Failure matrix (each row = sim fixture)

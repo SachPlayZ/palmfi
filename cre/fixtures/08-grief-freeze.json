@@ -1,0 +1,10 @@
+{
+  "row": "Attacker freezes (grief)",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "A wallet calls freeze(); later RequestQueued logs for that Vault are skipped until a majority / Recovery key unfreezes.",
+  "expect": "SKIP_VAULT_INACTIVE",
+  "unitTest": "sentinel/failure-matrix.test.ts row 8",
+  "enabled": false
+}
