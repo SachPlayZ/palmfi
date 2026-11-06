@@ -1,0 +1,35 @@
+{
+  "chainId": 11155111,
+  "uniswap": {
+    "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+    "positionManager": "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4",
+    "stateView": "0xE1Dd9c3fA50EDB962E442f60DfBc432e24537E4C",
+    "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+    "universalRouter": "0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3",
+    "v4Quoter": "0x68aFa8b853cAa7a2D40B0F6AEE5C4DbC147C8244"
+  },
+  "tokens": {
+    "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+    "weth": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "link": "0x779877A7B0D9E8603169DdbD7836e478b4624789"
+  },
+  "feeds": {
+    "ethUsd": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+    "usdcUsd": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
+    "linkUsd": "0xc59E3633BAAC79493d908e63626716e204A45EdF"
+  },
+  "ens": {
+    "parentLabel": "palmfi",
+    "parentOwner": "0xAc99290B7Cd053276839Fb4bfB33dA9cdABF727D",
+    "universalResolver": "0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe",
+    "rootRegistry": "0xB458d6a3a77919449d03e7A6903C26827c1eC43f",
+    "ethRegistry": "0xD4EbCbBdF463c9C45784603dB0DDd499bc44a8B4",
+    "verifiableFactory": "0xDa70306c98E97ecE36F997a21368E53298572991",
+    "permissionedResolverImpl": "0x115EB53f0C60696633855F90B138178fb40b2b2C",
+    "userRegistryImpl": "0x9Bd8A88719068d09eCee662f36C0e3856708366a"
+  },
+  "cre": {
+    "simForwarder": "0x15fC6ae953E024d975e77382eEeC56A9101f9F88",
+    "forwarder": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482"
+  }
+}
