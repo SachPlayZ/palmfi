@@ -54,6 +54,8 @@ contract VaultFactory is ERC1155Holder {
         address registry;
         address safetyFund;
         address approvalBook;
+        address verifier;
+        address vaultModule;
         address vaultImpl;
         address tokenImpl;
         address poolManager;
@@ -70,6 +72,8 @@ contract VaultFactory is ERC1155Holder {
     address public immutable registry;
     address public immutable safetyFund;
     address public immutable approvalBook;
+    address public immutable verifier;
+    address public immutable vaultModule;
     address public immutable vaultImpl;
     address public immutable tokenImpl;
     address public immutable poolManager;
@@ -111,6 +115,8 @@ contract VaultFactory is ERC1155Holder {
         registry = w.registry;
         safetyFund = w.safetyFund;
         approvalBook = w.approvalBook;
+        verifier = w.verifier;
+        vaultModule = w.vaultModule;
         vaultImpl = w.vaultImpl;
         tokenImpl = w.tokenImpl;
         poolManager = w.poolManager;
@@ -200,6 +206,8 @@ contract VaultFactory is ERC1155Holder {
         w.usdc = usdc;
         w.safetyFund = safetyFund;
         w.approvalBook = approvalBook;
+        w.verifier = verifier;
+        w.module = vaultModule;
         w.underlyings = new address[](n);
         w.tokens = new address[](n);
         w.feeds = new address[](n);
@@ -250,7 +258,7 @@ contract VaultFactory is ERC1155Holder {
         Name memory nm = _names[lh];
         if (nm.vault == address(0)) revert UnknownName();
         if (IHubFactory(hub).statusOf(nm.vault) != T.STATUS_MIGRATED) revert NotMigrated();
-        if (msg.sender != Vault(payable(nm.vault)).recoveryKey()) revert NotRecoveryKey();
+        if (msg.sender != VaultBaseLike(nm.vault).recoveryKey()) revert NotRecoveryKey();
         if (cfg.hotWallets.length == 0 || cfg.recoveryKey == address(0) || cfg.recoveryVault == address(0)) {
             revert BadConfig();
         }
@@ -310,4 +318,8 @@ contract VaultFactory is ERC1155Holder {
     function defaultDelegates() external view returns (address[] memory) {
         return _defaultDelegates;
     }
+}
+
+interface VaultBaseLike {
+    function recoveryKey() external view returns (address);
 }

@@ -30,6 +30,7 @@ contract Deploy is Script, SepoliaConfig, NetworkDeployer {
         vm.serializeAddress(k, "tokenImpl", d.tokenImpl);
         vm.serializeAddress(k, "ensUserRegistry", d.ensUserRegistry);
         vm.serializeAddress(k, "ensResolver", d.ensResolver);
+        vm.serializeBool(k, "ensAttached", d.ensAttached);
         string memory json = vm.serializeAddress(k, "deployer", d.deployer);
         vm.writeJson(json, OUT);
     }
