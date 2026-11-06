@@ -9,6 +9,9 @@ import { linkMessage, makeLinkToken, safeEqual, sendTelegram, verifyLinkToken } 
 
 export type Env = Record<string, string | undefined>;
 
+/** The bot token: TELEGRAM_API_KEY, or the older TELEGRAM_BOT_TOKEN name. */
+export const botTokenOf = (env: Env) => env.TELEGRAM_API_KEY || env.TELEGRAM_BOT_TOKEN || undefined;
+
 export type Deps = {
   env: Env;
   kv: KV | null;
@@ -112,8 +115,8 @@ export async function handleNotify(req: Request, deps: Deps): Promise<Response> 
   const body = parseNotifyBody(raw);
   if (typeof body === "string") return json(400, { ok: false, error: body });
 
-  const botToken = deps.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) return json(503, { ok: false, error: "TELEGRAM_BOT_TOKEN not configured" });
+  const botToken = botTokenOf(deps.env);
+  if (!botToken) return json(503, { ok: false, error: "TELEGRAM_API_KEY not configured" });
   if (!deps.kv) return json(503, { ok: false, error: "KV not configured" });
 
   const chats = parseChats(await deps.kv.get(chatKey(body.vault)));
@@ -132,7 +135,7 @@ export async function handleNotify(req: Request, deps: Deps): Promise<Response> 
 export const parseChats = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
 
 function linkSecret(env: Env): string | undefined {
-  return env.TELEGRAM_LINK_SECRET ?? env.TELEGRAM_BOT_TOKEN;
+  return env.TELEGRAM_LINK_SECRET ?? botTokenOf(env);
 }
 
 /**
@@ -169,7 +172,7 @@ export async function handleLinkToken(req: Request, deps: Deps): Promise<Respons
   return json(200, { ok: true, token, url: `https://t.me/${bot}?start=${token}` });
 }
 
-type TelegramUpdate = { message?: { text?: string; chat?: { id?: number | string } } };
+export type TelegramUpdate = { message?: { text?: string; chat?: { id?: number | string } } };
 
 /**
  * POST /api/telegram/link: the bot's webhook. On `/start <token>` it stores vault → chatId in KV.
@@ -181,29 +184,35 @@ export async function handleTelegramWebhook(req: Request, deps: Deps): Promise<R
   if (!safeEqual(req.headers.get("x-telegram-bot-api-secret-token") ?? "", hookSecret)) {
     return json(401, { ok: false, error: "bad webhook secret" });
   }
-  const secret = linkSecret(deps.env);
-  const botToken = deps.env.TELEGRAM_BOT_TOKEN;
-  if (!secret || !botToken || !deps.kv) return json(503, { ok: false, error: "not configured" });
-
   let update: TelegramUpdate;
   try {
     update = await req.json();
   } catch {
     return json(400, { ok: false, error: "invalid JSON" });
   }
+  const r = await processTelegramUpdate(update, deps);
+  if (r === "not configured") return json(503, { ok: false, error: r });
+  return json(200, { ok: true, ...r });
+}
+
+/** Handles one bot update (from the webhook or from getUpdates polling): `/start <token>` links the chat. */
+export async function processTelegramUpdate(update: TelegramUpdate, deps: Deps): Promise<{ linked: boolean; vault?: Address } | "not configured"> {
+  const secret = linkSecret(deps.env);
+  const botToken = botTokenOf(deps.env);
+  if (!secret || !botToken || !deps.kv) return "not configured";
   const text = update.message?.text?.trim() ?? "";
   const chatId = update.message?.chat?.id;
   // Always 200 for updates we ignore, so Telegram doesn't redeliver them.
-  if (chatId === undefined) return json(200, { ok: true, linked: false });
+  if (chatId === undefined) return { linked: false };
   const m = /^\/start(?:@\w+)?\s+(\S+)$/.exec(text);
   if (!m) {
-    await sendTelegram(botToken, String(chatId), "Open palmfi and use \"Link Telegram\" on your Vault to connect this chat.", deps.fetch);
-    return json(200, { ok: true, linked: false });
+    await sendTelegram(botToken, String(chatId), "Open palmfi and use \"Connect Telegram\" on your Vault to connect this chat.", deps.fetch);
+    return { linked: false };
   }
   const vault = verifyLinkToken(m[1], secret);
   if (!vault) {
     await sendTelegram(botToken, String(chatId), "That link is invalid. Generate a new one from your Vault in palmfi.", deps.fetch);
-    return json(200, { ok: true, linked: false });
+    return { linked: false };
   }
   const chats = parseChats(await deps.kv.get(chatKey(vault)));
   if (!chats.includes(String(chatId))) await deps.kv.set(chatKey(vault), [...chats, String(chatId)].join(","));
@@ -213,5 +222,21 @@ export async function handleTelegramWebhook(req: Request, deps: Deps): Promise<R
     `Linked. This chat will get palmfi alerts (unusual requests, FLAG, Freeze, settings changes) for Vault ${vault}.`,
     deps.fetch,
   );
-  return json(200, { ok: true, linked: true, vault });
+  return { linked: true, vault };
+}
+
+/**
+ * GET /api/telegram/status?vault=0x…: how many Telegram chats are linked to the Vault. Without a webhook
+ * (local dev: TELEGRAM_WEBHOOK_SECRET unset) it first drains the bot's getUpdates queue, so `/start` still links.
+ */
+export async function handleTelegramStatus(req: Request, deps: Deps, poll?: () => Promise<TelegramUpdate[]>): Promise<Response> {
+  const vault = new URL(req.url).searchParams.get("vault") ?? "";
+  if (!isAddress(vault)) return json(400, { ok: false, error: "vault must be an address" });
+  const botToken = botTokenOf(deps.env);
+  if (!botToken || !deps.kv) return json(503, { ok: false, error: "Telegram bot not configured" });
+  if (!deps.env.TELEGRAM_WEBHOOK_SECRET && poll) {
+    for (const u of await poll().catch(() => [])) await processTelegramUpdate(u, deps);
+  }
+  const chats = parseChats(await deps.kv.get(chatKey(getAddress(vault))));
+  return json(200, { ok: true, linked: chats.length > 0, chats: chats.length });
 }

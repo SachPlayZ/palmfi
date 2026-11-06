@@ -11,8 +11,23 @@ export interface KV {
 export function kvFromEnv(env: Record<string, string | undefined> = process.env, f: typeof fetch = fetch): KV | null {
   const url = env.KV_REST_API_URL ?? env.UPSTASH_REDIS_REST_URL;
   const token = env.KV_REST_API_TOKEN ?? env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  return upstashKv(url, token, f);
+  if (url && token) return upstashKv(url, token, f);
+  // Local dev without Vercel KV: keep links in process memory (lost on restart).
+  if (env.NODE_ENV !== "production") return memoryKv();
+  return null;
+}
+
+export function memoryKv(): KV {
+  const g = globalThis as { __palmfiKv?: Map<string, string> };
+  const m = (g.__palmfiKv ??= new Map());
+  return {
+    async get(key) {
+      return m.get(key) ?? null;
+    },
+    async set(key, value) {
+      m.set(key, value);
+    },
+  };
 }
 
 export function upstashKv(url: string, token: string, f: typeof fetch = fetch): KV {

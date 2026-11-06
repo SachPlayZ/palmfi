@@ -1,7 +1,7 @@
-import { SendTab } from "@/components/vault/tabs";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Send & pay" };
-
-export default function VaultSendPage() {
-  return <SendTab />;
+/** Send lives in the Overview's Send modal now; keep old links working. */
+export default async function VaultSendPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/vault/${id}?action=send`);
 }

@@ -67,10 +67,10 @@ Every Voter gets a Telegram alert on long delays, FLAGs and settings changes, so
 
 | Contract | Address |
 |---|---|
-| Hub | [`0x3cd22D98571884dC9d0692e520B5A7Aa4d95B22A`](https://testnet.arcscan.app/address/0x3cd22D98571884dC9d0692e520B5A7Aa4d95B22A) |
-| VaultFactory | [`0x93bE1040670dAe5Fc89323fA611ee3CFC16aA169`](https://testnet.arcscan.app/address/0x93bE1040670dAe5Fc89323fA611ee3CFC16aA169) |
-| OrbitalHook | [`0x41486F067436710330ab399c1D9f2394424b2888`](https://testnet.arcscan.app/address/0x41486F067436710330ab399c1D9f2394424b2888) |
-| OrbitalRouter | [`0x973c94D3B45ad92d8DA6640cc950718e6248842b`](https://testnet.arcscan.app/address/0x973c94D3B45ad92d8DA6640cc950718e6248842b) |
+| Hub | [`0x7597a94370cBA54DFa94271a02cB8E83c95Ee31f`](https://testnet.arcscan.app/address/0x7597a94370cBA54DFa94271a02cB8E83c95Ee31f) |
+| VaultFactory | [`0xf135C2464d15c1Da6fad24d5e4305C0FD989B9ca`](https://testnet.arcscan.app/address/0xf135C2464d15c1Da6fad24d5e4305C0FD989B9ca) |
+| OrbitalHook | [`0x410309DcDDAc53bfe75A5c18Edb71C5562C92888`](https://testnet.arcscan.app/address/0x410309DcDDAc53bfe75A5c18Edb71C5562C92888) |
+| OrbitalRouter | [`0x331E265Af9E025F61E1e5dEEeAB8D73f0fb17773`](https://testnet.arcscan.app/address/0x331E265Af9E025F61E1e5dEEeAB8D73f0fb17773) |
 | Vault impl / VaultModule / token impl | see [`deployments/arc.json`](deployments/arc.json) |
 
 Uniswap v4 PoolManager on Arc: `0x1d70945634f618eefdf9edaadb59b9a183cef929`. USDC ERC-20: `0x3600000000000000000000000000000000000000`.
@@ -135,5 +135,5 @@ Open http://localhost:3000, connect a wallet on Arc testnet, onboard an org with
 
 - The testnet Hub trusts CRE's **simulation forwarder** so the demo can run through `cre workflow simulate --broadcast`; anyone can forge reports to it. Production pins the Keystone forwarder and the workflow identity (`Hub.pinWorkflow`).
 - Veto needs a majority of the non-requester wallets: an offline honest wallet counts against the veto. Alerts to every Voter exist to keep them present.
-- The Orbital pool implements Paradigm's ticks (nested spherical caps, boundary ticks consolidated onto a circle, interior onto one sphere: the torus invariant), with ten price-floor ticks per LP choice. It keeps a 20× virtual concentration so unevenly funded pools stay on the curve; ticks are measured on those virtual reserves as price bands. The Arc deployment predates `OrbitalTicks` (needs a redeploy to carry it).
+- The Orbital pool implements Paradigm's ticks (nested spherical caps, boundary ticks consolidated onto a circle, interior onto one sphere: the torus invariant), with ten price-floor ticks per LP choice. It keeps a 20× virtual concentration so unevenly funded pools stay on the curve; ticks are measured on those virtual reserves as price bands. The Arc deployment includes `OrbitalTicks`.
 - Passkey voters for Individuals are deferred.

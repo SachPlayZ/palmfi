@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { erc20Abi, formatUnits } from "viem";
 import { useAccount, useReadContract, useWatchAsset } from "wagmi";
 import { ago, useVaultActivity, type Activity } from "@/lib/activity";
@@ -9,7 +10,7 @@ import { useNames } from "@/lib/hub";
 import { arcTestnet, network, txUrl } from "@/lib/network";
 import { CHANGE_LABEL, REQ, REQ_LABEL, STATUS_LABEL, decodeReasonCodes, formatBits, formatUsd } from "@/lib/palm";
 import { LiquidityCard, PoolPayCard } from "../pay";
-import { TelegramLink } from "../telegram-link";
+import { TelegramButton, TelegramLink } from "../telegram-link";
 import { CopyButton, EmptyState, Glyph, Skeleton, useOrigin } from "../brand";
 import { Card, Modal, Notice } from "../ui";
 import { ReceiveTab } from "./receive";
@@ -57,12 +58,25 @@ export function OverviewTab() {
   );
 }
 
+const ACTIONS = ["deposit", "send", "receive", "liquidity"] as const;
+type Action = (typeof ACTIONS)[number];
+
 /** The vault's money, read live from Arc: USDC held by the Vault contract, and what the viewer can do with it. */
 function BalanceHero() {
   const v = useV();
-  const [open, setOpen] = useState<"deposit" | "send" | "receive" | null>(null);
+  const [open, setOpen] = useState<Action | null>(null);
   const [sendMode, setSendMode] = useState<"name" | "direct">("name");
   const close = useCallback(() => setOpen(null), []);
+  // ?action=send|deposit|receive|liquidity opens that modal (old /send links and other pages point here).
+  const params = useSearchParams();
+  const router = useRouter();
+  const path = usePathname();
+  const action = params.get("action");
+  useEffect(() => {
+    if (!action || !ACTIONS.includes(action as Action)) return;
+    setOpen(action as Action);
+    router.replace(path, { scroll: false });
+  }, [action, path, router]);
   const { address } = useAccount();
   const roles = useRoles(v);
   const walletUsdc = useReadContract({
@@ -108,6 +122,10 @@ function BalanceHero() {
           <button type="button" className="pf-btn line" onClick={() => setOpen("receive")}>
             Receive
           </button>
+          <button type="button" className="pf-btn line" onClick={() => setOpen("liquidity")}>
+            Pool liquidity
+          </button>
+          {(roles.isWallet || roles.isRecovery) && v.vault && <TelegramButton vault={v.vault} />}
         </div>
       </div>
       <dl className="grid grid-cols-2 border-t border-[var(--line)] bg-[var(--paper-2)] sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]" style={{ "--n": stats.length } as React.CSSProperties}>
@@ -144,6 +162,9 @@ function BalanceHero() {
           ))}
         </div>
         {sendMode === "name" ? <PoolPayCard v={v} /> : <SendCard v={v} />}
+      </Modal>
+      <Modal open={open === "liquidity"} onClose={close} title="Pool liquidity">
+        <LiquidityCard v={v} />
       </Modal>
       <Modal open={open === "receive"} onClose={close} title="Receive">
         <div className="flex flex-col [&_.pf-grid2]:!grid-cols-1">
@@ -252,7 +273,7 @@ export function RequestsTab() {
           title={k === "open" ? "Nothing queued" : "No requests here"}
           body="Anything above the Instant budget lands here: the Sentinel scores it, and your wallets can veto or fast-track it."
           action={
-            <Link className="pf-btn line" href={`${base}/send`}>
+            <Link className="pf-btn line" href={`${base}?action=send`}>
               Send a payment
             </Link>
           }
@@ -283,22 +304,6 @@ export function RequestDetailTab({ rid }: { rid: string }) {
 }
 
 /* ───────────── send & pay ───────────── */
-
-export function SendTab() {
-  const v = useV();
-  return (
-    <>
-      <div className="pf-grid2">
-        <SendCard v={v} />
-        <PoolPayCard v={v} />
-      </div>
-      <div className="pf-grid2">
-        <DepositCard v={v} />
-        <LiquidityCard v={v} />
-      </div>
-    </>
-  );
-}
 
 /* ───────────── wallets ───────────── */
 

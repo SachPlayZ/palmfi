@@ -49,7 +49,7 @@ export function VaultHeader({ v }: { v: VaultView }) {
             Public page
           </Link>
           {roles.isWallet && (
-            <Link href={`/vault/${v.name ?? v.vault}/send`} className="pf-btn dark">
+            <Link href={`/vault/${v.name ?? v.vault}?action=send`} className="pf-btn dark">
               Send or pay
             </Link>
           )}

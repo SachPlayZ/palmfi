@@ -1,5 +1,6 @@
-import { createPublicClient, http, isAddress, parseAbi, recoverMessageAddress, type Hex } from "viem";
+import { createPublicClient, isAddress, parseAbi, recoverMessageAddress, type Hex } from "viem";
 import { deployments } from "@/lib/deployments";
+import { arcTransport } from "@/lib/rpc";
 import { arcTestnet } from "@/lib/network";
 import { kvFromEnv } from "@/lib/server/kv";
 import { adminMessage, verifyMessage, type VerifyRequest } from "@/lib/verify";
@@ -11,7 +12,7 @@ const KEY = "verify:requests";
 const MAX_AGE = 10 * 60;
 const abi = parseAbi(["function isWallet(address) view returns (bool)", "function admin() view returns (address)"]);
 
-const client = () => createPublicClient({ chain: arcTestnet, transport: http(process.env.ARC_RPC_URL || process.env.NEXT_PUBLIC_ARC_RPC_URL) });
+const client = () => createPublicClient({ chain: arcTestnet, transport: arcTransport(process.env.ARC_RPC_URL || process.env.NEXT_PUBLIC_ARC_RPC_URL) });
 const fresh = (t: number) => Number.isFinite(t) && Math.abs(Date.now() / 1000 - t) < MAX_AGE;
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const clip = (s: unknown, n: number) => (typeof s === "string" ? s.trim().slice(0, n) : "");

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import { BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, erc20Abi, isAddress, type Address, type Hex } from "viem";
-import { useReadContract, useReadContracts } from "wagmi";
+import { useReadContract, useReadContracts, useBytecode } from "wagmi";
 import { hubAbi, orbitalHookAbi, vaultAbi } from "@/abi";
 import type { ScoringContext } from "./deviation";
 import { deployments } from "./deployments";
@@ -119,6 +119,11 @@ export function useVault(vault: Address | undefined) {
   const rejected =
     tokenErr instanceof BaseError &&
     !!tokenErr.walk((e) => e instanceof ContractFunctionZeroDataError || e instanceof ContractFunctionRevertedError);
+  // Confirm with eth_getCode: a flaky node can answer "0x" to a call, but an address with no code is definitive.
+  const code = useBytecode({ address: vault, chainId, query: { enabled: enabled && rejected && !s } });
+  // A real revert from deployed code (some other contract) is also definitive; an empty "0x" answer alone is not.
+  const reverted = tokenErr instanceof BaseError && !!tokenErr.walk((e) => e instanceof ContractFunctionRevertedError);
+  const noCode = code.isSuccess && (!code.data || code.data === "0x" || reverted);
   const tail = base.data?.slice(SCALARS.length);
   const status = tail?.[0]?.result as number | undefined;
   const lastHeartbeat = tail?.[1]?.result as bigint | undefined;
@@ -209,7 +214,7 @@ export function useVault(vault: Address | undefined) {
     requests,
     changes,
     isLoading: base.isLoading,
-    notVault: base.isSuccess && !s && rejected,
+    notVault: base.isSuccess && !s && rejected && noCode,
     refetch: () => {
       base.refetch();
       balQ.refetch();

@@ -639,7 +639,7 @@ function PaneHead({ title, body }: { title: string; body: string }) {
 function Success({ name, vault }: { name: string; vault: Address }) {
   const join = `${useOrigin()}/join/${name}`;
   const steps = [
-    { t: "Deposit USDC", d: "Mint your token 1:1.", href: `/vault/${name}/send` },
+    { t: "Deposit USDC", d: "Mint your token 1:1.", href: `/vault/${name}?action=deposit` },
     { t: "Invite your voters", d: "Share the join link with each wallet owner.", copy: join },
     { t: "Link your alerts", d: "Telegram pings for reviews and flags.", tg: true },
   ];
