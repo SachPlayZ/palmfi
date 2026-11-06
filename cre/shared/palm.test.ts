@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import * as P from "./palm";
 
-const SOL = readFileSync(join(import.meta.dir, "../../contracts/src/libraries/PalmTypes.sol"), "utf8");
+// node:fs is typed `never` by the SDK (WASM has no fs), so read through Bun.
+const SOL = await Bun.file(`${import.meta.dir}/../../contracts/src/libraries/PalmTypes.sol`).text();
+const VAULT = await Bun.file(`${import.meta.dir}/../../contracts/src/Vault.sol`).text();
 
 /** Every `uintN internal constant NAME = VALUE;` in PalmTypes.sol, with `1 << n` evaluated. */
 const solConstants = (): Map<string, bigint> => {
@@ -47,8 +47,7 @@ describe("palm.ts mirrors PalmTypes.sol", () => {
   });
 
   test("Vault.STALENESS_MARGIN", () => {
-    const vault = readFileSync(join(import.meta.dir, "../../contracts/src/Vault.sol"), "utf8");
-    expect(vault).toContain("STALENESS_MARGIN = 1 hours;");
+    expect(VAULT).toContain("STALENESS_MARGIN = 1 hours;");
     expect(P.STALENESS_MARGIN).toBe(3600n);
   });
 });
