@@ -306,12 +306,11 @@ contract Vault is VaultBase {
         hub.emitOutflow(wallet, msg.sender, amount, true);
     }
 
-    /// Settlement, issuer side: burn `amount` of this Vault's tokens held by the PoolManager and send their
-    /// USDC backing to `toVault`. Halts while Frozen (a frozen token is a depeg, ADR-0010).
+    /// Settlement, issuer side: the hook has just moved `amount` of this Vault's tokens out of the pool to this
+    /// Vault; burn them and send their USDC backing to `toVault`. Halts while Frozen (a frozen token is a depeg).
     function settleOut(uint256 amount, address toVault) external onlyHook outflowsOpen {
         if (!factory.isVault(toVault) || toVault == address(this)) revert NotFactoryVault();
-        ProtectedToken t = ProtectedToken(token);
-        t.burn(t.poolManager(), amount);
+        ProtectedToken(token).burn(address(this), amount);
         IERC20(usdc).safeTransfer(toVault, amount);
     }
 

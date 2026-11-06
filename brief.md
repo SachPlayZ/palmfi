@@ -205,11 +205,12 @@ Every Protected token is 1:1 USDC-backed, so all trade near $1, the case Orbital
 - Reserves `x ∈ ℝⁿ`, sphere invariant `‖r·1 − x‖² = r²`; equal-price point `x_i = r(1 − 1/√n)`.
 - **Ticks** = spherical caps `x · v ≤ k` (v = (1,…,1)/√n), nested; interior ticks share one sphere, boundary ticks pinned to their plane. Consolidated as a torus: interior sphere ⊕ boundary circle.
 - Trade solve: fix in/out amounts on 2 coordinates, solve the consolidated invariant (Newton, fixed-point, ≤ 8 iterations onchain), check for tick crossings, cross and re-solve.
+- **Shipped (#33, ladder step 2):** one sphere on **virtual reserves** `X = x + V`, `V = (C−1)·L/N`, `C = 20` (what a single boundary tick does: a balanced pool trades like a 20× deeper one, and no trade takes more than the real reserve). A pairwise trade keeps `a_i² + a_j²` constant (`a = r − X`), so exact-in and exact-out are **closed form** (one `sqrt`, no Newton). `r` is re-fit on every LP / settlement event. Ticks (#35) stay a follow-up.
 - Fixed-point via `PRBMath`/`FixedPointMathLib` sqrt; fuzz vs a Python reference.
 
 ### 8.3 Hook shape
 
-- Singleton `OrbitalHook` holds all N reserves (in PoolManager as ERC-6909 claims). Each pair `PoolKey(tokenA, tokenB, hook)` is initialized by the factory only (`beforeInitialize` pin); `beforeAddLiquidity` reverts (LP goes through the hook's own `addLiquidity(tick, amounts)`).
+- Singleton `OrbitalHook` holds all N reserves (in PoolManager as ERC-6909 claims). The own router `OrbitalRouter` is the one trusted `msgSender()` source. Each pair `PoolKey(tokenA, tokenB, hook)` is initialized by the factory only (`beforeInitialize` pin); `beforeAddLiquidity` reverts (LP goes through the hook's own `addLiquidity(tick, amounts)`).
 - `beforeSwap` + `beforeSwapReturnDelta`: NoOp custom curve (LitePSM pattern; docs/research/uniswap-v4.md).
 - **Payer controls on swap-in:** the hook calls the payer's vault `chargeOutflow(user, amount)`. Within budget it passes; above it reverts "use `requestPayment`", which queues and later executes the swap from the vault.
 - Read the real user via `msgSender()` only from trusted routers.
