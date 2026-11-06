@@ -1,0 +1,3 @@
+# The Protected token enforces the whitelist, including PoolManager custody
+
+A Protected token transfer is allowed only between the Owner's own Hot wallets, into the Uniswap PoolManager, or out of the PoolManager to one of the Owner's Hot wallets. The hook can't see the final recipient of a Universal Router route, and anyone can mint ERC-6909 claims on tokens the PoolManager holds, so a check in the hook alone would leak. Enforcing the rule in the token makes every path to an outsider fail at the moment tokens leave the PoolManager. Claims can still circulate, but only a Hot wallet can redeem them. We rejected fronting the token with Uniswap's Permissions Adapter: it checks addresses but not amounts.
