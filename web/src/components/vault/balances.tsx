@@ -118,7 +118,7 @@ export function DepositCard({ v }: { v: VaultView }) {
   }
 
   return (
-    <Card label="Deposit" title="Add USDC, receive your token">
+    <Card label="Deposit" title="Add USDC, receive your token" id="deposit">
       <div className="flex flex-col gap-3">
         <Field label="Amount" hint={bal.data !== undefined ? `This wallet: ${fmtAmount(bal.data)} USDC` : undefined}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />

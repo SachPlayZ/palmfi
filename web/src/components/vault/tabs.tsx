@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { formatUnits } from "viem";
+import { erc20Abi, formatUnits } from "viem";
+import { useAccount, useReadContract } from "wagmi";
 import { ago, useVaultActivity, type Activity } from "@/lib/activity";
 import { useNames } from "@/lib/hub";
-import { txUrl } from "@/lib/network";
+import { arcTestnet, network, txUrl } from "@/lib/network";
 import { CHANGE_LABEL, REQ, REQ_LABEL, STATUS_LABEL, decodeReasonCodes, formatBits, formatUsd } from "@/lib/palm";
 import { LiquidityCard, PoolPayCard } from "../pay";
 import { TelegramLink } from "../telegram-link";
@@ -29,6 +30,7 @@ export function OverviewTab() {
   const changes = v.changes.filter((c) => !c.done);
   return (
     <>
+      <BalanceHero />
       <Card label="Needs attention" title={open.length + changes.length ? `${open.length + changes.length} waiting on your team` : "All quiet"}>
         {open.length + changes.length === 0 ? (
           <div className="flex items-center gap-4 text-[15px] text-[var(--subtle)]">
@@ -48,29 +50,118 @@ export function OverviewTab() {
       </div>
       <div className="pf-grid2">
         <DepositCard v={v} />
-        <Card label="Shortcuts" title="Common moves">
-          <div className="pf-list">
-            {[
-              { href: `${base}/send`, t: "Send or pay another org", d: "Instant within the budget; anything larger is queued and scored." },
-              { href: `/request/new?to=${encodeURIComponent(v.name ?? "")}`, t: "Request a payment", d: "A link another org can open to pay you." },
-              { href: `${base}/wallets`, t: "Invite your voters", d: "Each wallet should link alerts so someone is there to say no." },
-              { href: `${base}/activity`, t: "Export activity", d: "Every request, vote and payment as CSV." },
-            ].map((x) => (
-              <Link key={x.t} href={x.href} className="pf-row group">
-                <span className="grow flex flex-col">
-                  <span className="text-[15px]">{x.t}</span>
-                  <span className="text-[13px] text-[var(--subtle)]">{x.d}</span>
-                </span>
-                <span className="text-[var(--subtle)] transition-transform duration-500 group-hover:translate-x-1">→</span>
-              </Link>
-            ))}
-          </div>
-          {!roles.isWallet && (
-            <p className="mt-4 text-[13px] text-[var(--subtle)]">You&apos;re viewing as a guest. Connect one of this vault&apos;s wallets to act.</p>
-          )}
-        </Card>
+        <RecentActivity />
       </div>
+      {!roles.isWallet && (
+        <p className="text-[13px] text-[var(--subtle)]">You&apos;re viewing as a guest. Connect one of this vault&apos;s wallets to act.</p>
+      )}
     </>
+  );
+}
+
+/** The vault's money, read live from Arc: USDC held by the Vault contract, and what the viewer can do with it. */
+function BalanceHero() {
+  const v = useV();
+  const base = useVaultBase();
+  const { address } = useAccount();
+  const roles = useRoles(v);
+  const walletUsdc = useReadContract({
+    address: network.usdc,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [address!],
+    chainId: arcTestnet.id,
+    query: { enabled: !!address, refetchInterval: 6_000 },
+  });
+  const mine = v.balances.find((b) => address && b.wallet.toLowerCase() === address.toLowerCase())?.balance;
+  const queued = v.requests.filter((r) => r.state === REQ.PENDING).reduce((a, r) => a + r.amount, 0n);
+  const spendable = v.s ? (v.s.availableBudget < v.usdcHeld ? v.s.availableBudget : v.usdcHeld) : 0n;
+  const stats = [
+    { k: "Spendable now", v: formatUsd(spendable), d: "within the instant budget" },
+    { k: "Queued out", v: formatUsd(queued), d: "waiting for review" },
+    ...(roles.isWallet && mine !== undefined ? [{ k: `Your ${v.symbol}`, v: formatUsd(mine), d: "held by your wallet" }] : []),
+    ...(address && walletUsdc.data !== undefined ? [{ k: "USDC in your wallet", v: formatUsd(walletUsdc.data), d: "not yet deposited" }] : []),
+  ];
+  return (
+    <section className="pf-card overflow-hidden !p-0">
+      <div className="flex flex-wrap items-end justify-between gap-6 p-6 sm:p-8">
+        <div className="flex flex-col gap-2">
+          <span className="pf-mono pf-dim flex items-center gap-2">
+            <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--leaf)]" /> USDC in this vault · live on Arc
+          </span>
+          <span className="pf-serif text-[clamp(48px,7vw,88px)] leading-[0.9] tracking-[-0.03em] tabular-nums">{formatUsd(v.usdcHeld)}</span>
+          <span className="text-[14px] text-[var(--subtle)]">
+            Backing {fmtUsdc(v.totalTokens + v.poolLiquidity)} {v.symbol} 1:1
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a href="#deposit" className="pf-btn dark">
+            Deposit
+          </a>
+          <Link href={`${base}/send`} className="pf-btn line">
+            Send
+          </Link>
+          <Link href={`${base}/receive`} className="pf-btn line">
+            Receive
+          </Link>
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 border-t border-[var(--line)] bg-[var(--paper-2)] sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]" style={{ "--n": stats.length } as React.CSSProperties}>
+        {stats.map((x) => (
+          <div key={x.k} className="flex flex-col gap-1 border-r border-[var(--line)] px-6 py-4 last:border-r-0">
+            <dt className="pf-mono pf-dim">{x.k}</dt>
+            <dd className="text-[20px] font-medium tabular-nums">{x.v}</dd>
+            <span className="text-[12px] text-[var(--subtle)]">{x.d}</span>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+const fmtUsdc = (x: bigint) => formatUsd(x).replace("$", "");
+
+/** Last few events for this vault, from the Hub's logs. */
+function RecentActivity() {
+  const v = useV();
+  const base = useVaultBase();
+  const q = useVaultActivity(v.vault);
+  const rows = useMemo(() => (q.data ?? []).slice(0, 6), [q.data]);
+  const name = useNames(rows.flatMap((a) => [a.args.destination as string | undefined]).filter((x, i, arr) => x && arr.indexOf(x) === i) as `0x${string}`[]);
+  return (
+    <Card
+      label="Recent activity"
+      title="Latest on-chain events"
+      actions={
+        <Link className="pf-btn ghost sm" href={`${base}/activity`}>
+          See all
+        </Link>
+      }
+    >
+      {q.isLoading ? (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} h={36} />
+          ))}
+        </div>
+      ) : !rows.length ? (
+        <p className="text-[14px] text-[var(--subtle)]">No requests, votes or payments yet. Deposits show up in the balance above.</p>
+      ) : (
+        <ul className="flex flex-col">
+          {rows.map((a) => {
+            const d = describe(a, name);
+            return (
+              <li key={`${a.tx}-${a.logIndex}`} className="flex items-baseline justify-between gap-4 border-b border-[var(--line)] py-3 last:border-b-0">
+                <span className="min-w-0 truncate text-[14px]">{d.title}</span>
+                <a className="pf-mono pf-dim shrink-0 hover:text-[var(--ink)]" href={txUrl(a.tx)} target="_blank" rel="noreferrer">
+                  {ago(a.at)}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
   );
 }
 

@@ -10,7 +10,9 @@ export function Card({
   tone,
   className = "",
   label,
+  id,
 }: {
+  id?: string;
   title?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
@@ -19,7 +21,7 @@ export function Card({
   label?: string;
 }) {
   return (
-    <section className={`pf-card ${tone ? `tone-${tone}` : ""} ${className}`} data-pf>
+    <section id={id} className={`pf-card scroll-mt-24 ${tone ? `tone-${tone}` : ""} ${className}`} data-pf>
       {(title || actions || label) && (
         <header className="pf-card-head">
           <div className="flex min-w-0 flex-col gap-1.5">

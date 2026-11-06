@@ -109,7 +109,7 @@ export function useVault(vault: Address | undefined) {
     if (!base.data) return undefined;
     const out: Record<string, unknown> = {};
     SCALARS.forEach((k, i) => (out[k] = base.data[i]?.result));
-    if (SCALARS.some((k) => out[k] === undefined)) return undefined;
+    if (out.token === undefined || out.wallets === undefined) return undefined;
     return out as Scalars;
   }, [base.data]);
   if (fresh) last.current = { vault, s: fresh };
