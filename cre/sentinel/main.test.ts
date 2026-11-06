@@ -78,7 +78,7 @@ describe("trigger registration", () => {
     const c = (h.trigger as unknown as { config: unknown }).config as { confidence: number; addresses: Uint8Array[]; topics: { values: Uint8Array[] }[] };
     expect(c.confidence).toBe(1); // ConfidenceLevel.LATEST
     expect(c.addresses).toHaveLength(1);
-    expect(Buffer.from(c.addresses[0]).toString("hex")).toBe(ADDR.hub.slice(2));
+    expect(Buffer.from(c.addresses[0]).toString("hex")).toBe(ADDR.hub.slice(2).toLowerCase());
     expect(c.topics[0].values.map((v) => `0x${Buffer.from(v).toString("hex")}`)).toEqual(SCORED_EVENTS.map(eventTopic));
   });
 });

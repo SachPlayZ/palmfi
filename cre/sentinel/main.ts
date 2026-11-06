@@ -25,6 +25,7 @@ import {
 import { decodeEventLog, encodeEventTopics, type Address, type Hex } from "viem";
 import { hubEventsAbi, vaultAbi } from "../shared/abi";
 import { Chain } from "../shared/chain";
+import { normalizeAddresses } from "../shared/config";
 import { flagVaults, inspectVaults } from "../shared/health";
 import { notify, type NotifyConfig } from "../shared/notify";
 import * as P from "../shared/palm";
@@ -96,7 +97,7 @@ export const onHubLog = (runtime: Runtime<Config>, log: EVMLog): string => {
     return `IGNORED undecodable log ${txHash}#${log.index}`;
   }
 
-  const cfg = runtime.config;
+  const cfg = normalizeAddresses(runtime.config);
   const scfg = scoringConfig(cfg);
   const evm = evmFor(cfg);
   const chain = new Chain(runtime, evm, cfg.multicall3);

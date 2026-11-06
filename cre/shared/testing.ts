@@ -27,7 +27,7 @@ import type { OnchainRequest } from "./scoring";
 export const SEPOLIA = getNetwork({ chainFamily: "evm", chainSelectorName: "ethereum-testnet-sepolia" })!.chainSelector
   .selector;
 
-export const ADDR = {
+const RAW_ADDR = {
   hub: "0x00000000000000000000000000000000000000a1",
   multicall3: "0xcA11bde05977b3631167028862bE2a173976CA11",
   book: "0x00000000000000000000000000000000000000b0",
@@ -35,7 +35,7 @@ export const ADDR = {
   usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
   ethUsd: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
   usdcUsd: "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
-  stateView: "0xE1Dd9c3fA50EDB962E442f60dfBc432e24537E4C",
+  stateView: "0xE1Dd9c3fA50EDB962E442f60DfBc432e24537E4C",
   alice: "0x000000000000000000000000000000000000a11c",
   nvidia: "0x00000000000000000000000000000000000000d1",
   hot: "0x00000000000000000000000000000000000000c1",
@@ -45,6 +45,11 @@ export const ADDR = {
   approver: "0x00000000000000000000000000000000000000a9",
   sweeper: "0x00000000000000000000000000000000000000ee",
 } as const satisfies Record<string, Address>;
+
+/** Checksummed, as the chain (and viem decoding) returns them. */
+export const ADDR = Object.fromEntries(
+  Object.entries(RAW_ADDR).map(([k, v]) => [k, getAddress(v.toLowerCase())]),
+) as { [K in keyof typeof RAW_ADDR]: Address };
 
 export type FakeVault = {
   institution: boolean;

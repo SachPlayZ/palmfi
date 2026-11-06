@@ -36,6 +36,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run test
+      # Compile the Sentinel and Reconciler to WASM exactly as `cre workflow simulate` does
+      # (cre-compile runs the SDK's runtime-compat and determinism checks).
+      - run: bun run build
 
   web:
     runs-on: ubuntu-latest
