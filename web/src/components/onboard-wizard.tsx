@@ -77,7 +77,7 @@ function AddressList({ list, setList, locked, placeholder }: { list: string[]; s
     const bad = items.filter((x) => !isAddress(x));
     const next = [...list];
     for (const x of items) if (isAddress(x) && !next.some((y) => eqA(x, y))) next.push(x);
-    setList(next);
+    setList(next.filter((x, i) => next.findIndex((y) => eqA(x, y)) === i));
     setErr(bad.length ? `${bad.length} entr${bad.length === 1 ? "y isn't an" : "ies aren't"} address${bad.length === 1 ? "" : "es"}` : undefined);
     setDraft(bad.join(" "));
   }
@@ -183,8 +183,8 @@ export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () 
   const [dests, setDests] = useState<string[]>([]);
 
   useEffect(() => {
-    if (address && !wallets.some((w) => eqA(w, address))) setWallets((w) => [address, ...w]);
-  }, [address, wallets]);
+    if (address) setWallets((w) => (w.some((x) => eqA(x, address)) ? w : [address, ...w]));
+  }, [address]);
   useEffect(() => {
     if (solo) return;
     const p = PRESETS.find((x) => x.k === preset)!;
