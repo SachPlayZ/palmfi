@@ -14,3 +14,5 @@ cre/**/dist/
 !.env.example
 .DS_Store
 *.tsbuildinfo
+cre/fixtures/logs/
+cre/**/.cre_build_tmp.js
