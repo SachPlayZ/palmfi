@@ -8,7 +8,7 @@
   "maxWritesPerRun": 5,
   "scoring": {
     "k": 2500,
-    "sFlag": 28000
+    "sFlag": 18000
   },
   "notifyDelaySeconds": 21600,
   "notify": {

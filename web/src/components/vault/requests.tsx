@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { vaultAbi } from "@/abi";
+import { deployments } from "@/lib/deployments";
 import { assess, type ScoringContext } from "@/lib/deviation";
 import { KIND, REQ, REQ_LABEL, decodeReasonCodes, formatBits, formatUsd } from "@/lib/palm";
 import { requestTimeline, voteProgress } from "@/lib/requests";
@@ -16,7 +17,7 @@ const stateTone: Record<number, "gray" | "green" | "amber" | "red" | "blue"> = {
 function WhyDelay({ v, r }: { v: VaultView; r: VaultRequest }) {
   const ctx = useScoringContext(v.vault, r.id);
   if (!ctx.data) return <p className="text-xs text-[var(--subtle)]">Loading the Sentinel&apos;s inputs…</p>;
-  const a = assess(ctx.data as unknown as ScoringContext);
+  const a = assess(ctx.data as unknown as ScoringContext, deployments.scoring);
   const rows: [string, number][] = [
     ["Amount vs usual", a.terms.amount],
     ["Destination", a.terms.dest],
@@ -37,7 +38,7 @@ function WhyDelay({ v, r }: { v: VaultView; r: VaultRequest }) {
           </li>
         ))}
       </ul>
-      <p className="mt-1 text-[var(--subtle)]">Every bit doubles the delay; ≥ 28 bits freezes the Vault.</p>
+      <p className="mt-1 text-[var(--subtle)]">Every {deployments.scoring.k / 1000} bits double the delay; ≥ {deployments.scoring.sFlag / 1000} bits freezes the Vault.</p>
     </div>
   );
 }

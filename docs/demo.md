@@ -10,6 +10,8 @@ Live on the deployment in [`deployments/arc.json`](../deployments/arc.json). Amo
 - [ ] A **payroll history** on nvidia, so the Sentinel has a baseline: about 8 small payments ($3–6) from different wallets to one payee address, made with `Send` before the demo. Scores below assume about 12 such outflows.
 - [ ] The Arc Studio app open: https://studio.arc.io/app/bd02f044-7cea-4167-b4b8-b41c3dc41502
 - [ ] Telegram linked for at least one nvidia wallet (dashboard, Notifications card).
+- [ ] nvidia marked verified, so its FLAG also blocklists the destination (Hub admin): `cast send <hub> "setVerified(address,bool)" <nvidia vault> true --rpc-url $ARC_RPC_URL --account <keystore>`.
+- [ ] Onboard with business hours (UTC) that cover the demo time; the scores below are for in-hours requests.
 
 **Scoring a request live:** every queued request emits `RequestQueued` on the Hub. Copy the tx hash from the toast's "view" link and run the Sentinel against it, writing the result onchain:
 
@@ -31,15 +33,15 @@ Show the pool line on both dashboards (pool holds more `palantirUSDC`, less `nvi
 **Say:** one pool for every org's token, Uniswap v4 hook, Paradigm Orbital math; nobody ever ends up holding another org's token.
 
 ### 3. Payroll, fast-tracked (30s)
-As `n2`, Send $8 to the payroll address: above the $5 budget, so it queues (1 USDC bond) at MaxDelay. Score it: about **3.5 bits → about 3 min**. Open **Why this delay?** to show the per-term breakdown (the UI re-runs the Sentinel's exact model on the same onchain inputs). As `n1`, `n3`, `n4` click **Fast-track**: 3 of 5 YES → executable at the 1-min Floor → **Execute**.
+As `n2`, Send $8 to the payroll address: above the $5 budget, so it queues (1 USDC bond) at MaxDelay. Score it: about **2–6 bits → 2–5 min** (the low end once wallets are a week old). Open **Why this delay?** to show the per-term breakdown (the UI re-runs the Sentinel's exact model on the same onchain inputs). As `n1`, `n3`, `n4` click **Fast-track**: 3 of 5 YES → executable at the 1-min Floor → **Execute**.
 **Say:** routine payments barely wait; a majority can always speed them up.
 
-### 4. Hacked engineer (60s)
+### 4. Hacked engineer (75s)
 `n5` is "hacked".
-1. **Sybil attempt:** as `n5`, propose **Add wallet** (attacker puppet) in Settings. Score the `ConfigChange` (event index 0): every open request is re-scored with `CONFIG_CHANGE_PENDING` (+4 bits). Any honest wallet clicks **Cancel** on the proposal (a single wallet can cancel a loosening change, but never a removal, unfreeze or migration).
-2. **Drain attempt:** as `n5`, Send $45 to a fresh address. Score it: amount, new destination and velocity add up to **about 13–21 bits → about 40 min to 5 h** (more at night UTC, and from a wallet under 7 days old). The Telegram alert reaches every Voter. As `n1`, `n2`, `n3` click **Veto**: 3 of the 4 non-requester wallets → **Vetoed**. The escrowed tokens go back to `n5` (still behind the budget); only a FLAG forfeits the bond. The money never left the Vault.
-3. **Freeze:** as `n1`, **Freeze Vault**. Every outflow and pool swap stops at once; deposits and incoming payments still arrive. Show the **Incident view**: what happened, and recovery options (a majority votes Unfreeze or Remove wallet, which the hacked wallet can't cancel; or Migrate to the fixed Recovery vault).
-**Say:** one valid signature only buys the budget; above it, the more unusual it is, the longer the team has to say no.
+1. **Drain attempt:** as `n5`, Send $45 to a fresh address. Score it: amount, new destination and a new wallet add up to **about 15 bits → about 1 h**. The Telegram alert reaches every Voter. As `n1`, `n2`, `n3` click **Veto**: 3 of the 4 non-requester wallets → **Vetoed**. The escrowed tokens go back to `n5` (still behind the budget) with the bond. The money never left the Vault.
+2. **Sybil, then drain again:** as `n5`, propose **Add wallet** (attacker puppet) in Settings and score the `ConfigChange` (event index 0). As `n5`, Send $45 to another fresh address and score it: the pending wallet add adds `CONFIG_CHANGE_PENDING` (+4 bits) → **about 19 bits → FLAG**. The Hub freezes the Vault, blocklists the destination network-wide and keeps `n5`'s bond, with no human in the loop. Every outflow and pool swap stops at once; deposits and incoming payments still arrive.
+3. **Incident view:** what happened (the Flagged and Frozen events, with reasons) and recovery: a majority votes Unfreeze or Remove wallet (the hacked wallet can't cancel either), or Migrate to the fixed Recovery vault. Any honest wallet clicks **Cancel** on the puppet proposal (a single wallet can cancel a loosening change).
+**Say:** one valid signature only buys the budget; above it, the more unusual it is, the longer the team has to say no, and past the threshold the Sentinel says no for them.
 
 ### 5. Frozen org in the pool (20s)
 With nvidia frozen, as `p1` try to pay `nvidia` again: the quote fails (`FrozenToken`). The frozen token is out of the pool until a majority unfreezes. Unfreeze: `n1` proposes **Unfreeze** on the Incident view, `n2` and `n3` vote → active.
@@ -52,4 +54,11 @@ With nvidia frozen, as `p1` try to pay `nvidia` again: the quote fails (`FrozenT
 
 ## Calibration note
 
-The FLAG threshold (28 bits) is calibrated for treasury scale: a $3M payment at 3am to a new address from a new wallet scores about 30 bits. At faucet scale the same attack scores about 25 bits, so scene 4 shows the long-delay-and-veto path, and a live FLAG (automatic freeze plus network blocklist) is covered by the unit tests and fixtures instead. Lowering `scoring.sFlag` in `cre/sentinel/config.staging.json` to 20000 would make scene 4's drain attempt FLAG live.
+Production FLAGs at 28 bits, calibrated for treasury scale: a $3M payment at 3am to a new address from a new wallet scores about 30 bits. Faucet-sized attacks score lower, so the **staging** Sentinel and Reconciler FLAG at **18 bits** (`scoring.sFlag` 18000 in `cre/*/config.staging.json`; the web app's "Why this delay?" reads the same value through `pnpm sync:deployments`). With about 12 payroll outflows of $3–6 and demo limits:
+
+| Request | Score | Outcome |
+|---|---|---|
+| $8 payroll, in hours | 2–6 bits | 2–5 min |
+| $45 to a fresh address, new wallet | 15 bits | about 1 h |
+| same, with a wallet add pending | 19 bits | FLAG |
+| $45 to a fresh address at 03:00 UTC, new wallet | 18 bits | FLAG |
