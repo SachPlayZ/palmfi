@@ -225,43 +225,6 @@ function Hills({ className, speed = 1, sky = ["#ffffff", "#fbf9ef", "#f4ecc0"] }
   return <canvas ref={ref} className={`m-hills ${className ?? ""}`} aria-hidden />;
 }
 
-/* ───────────────────────── nav ───────────────────────── */
-
-function Nav() {
-  const [state, setState] = useState({ solid: false, hide: false });
-  useEffect(() => {
-    let last = window.scrollY;
-    const on = () => {
-      const y = window.scrollY;
-      setState({ solid: y > 24, hide: y > 500 && y > last });
-      last = y;
-      document.documentElement.style.setProperty("--doc-p", (y / Math.max(1, document.body.scrollHeight - innerHeight)).toFixed(4));
-    };
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
-  return (
-    <header className={`m-nav ${state.solid ? "solid" : ""} ${state.hide ? "hide" : ""}`}>
-      <div className="m-progress" />
-      <Link href="/" className="m-logo" aria-label="palmfi home">
-        <Mark />
-        <span>palmfi</span>
-      </Link>
-      <nav className="m-links">
-        <a href="#lanes">Lanes</a>
-        <a href="#try">Try it</a>
-        <a href="#sentinel">Smart review</a>
-        <a href="#network">Pay by name</a>
-        <a href="#pieces">How it works</a>
-      </nav>
-      <Link href="/onboard" className="m-pill">
-        Open a vault
-      </Link>
-    </header>
-  );
-}
-
 function Mark() {
   return (
     <svg className="m-mark" viewBox="0 0 24 24" aria-hidden>
@@ -1106,7 +1069,6 @@ export function Meadow() {
   useReveals();
   return (
     <div className="meadow">
-      <Nav />
       <main>
         <Hero />
         <Statement />

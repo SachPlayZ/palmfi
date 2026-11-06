@@ -11,6 +11,7 @@
   "vaultModule": "0xe259e2435E589b96150A1ebEb32f7DD766C05A06",
   "scoring": {
     "k": 2500,
-    "sFlag": 18000
+    "sFlag": 18000,
+    "sQuiet": 2500
   }
 }

@@ -477,7 +477,7 @@ export function OnboardWizard() {
   return (
     <>
       <PageHead
-        index="(Create a vault)"
+        index={params.get("as") === "individual" ? "(Individual vault)" : "(Institution vault)"}
         title="Set up your vault"
         em="in six steps."
         lede="Five minutes, one transaction. You can tighten anything later in a click; loosening takes a vote and a timelock."
