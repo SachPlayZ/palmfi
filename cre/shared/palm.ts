@@ -75,8 +75,25 @@ export const REASON_CODES = {
 export type ReasonName = keyof typeof REASON_CODES;
 
 /** Human-readable names of the bits set in a reason-code bitmap, in bit order. */
-export const reasonNames = (codes: bigint): ReasonName[] =>
-  (Object.keys(REASON_CODES) as ReasonName[]).filter((k) => (codes & REASON_CODES[k]) !== 0n);
+export const reasonNames = (codes: bigint): ReasonName[] => REASON_ORDER.filter((k) => (codes & REASON_CODES[k]) !== 0n);
+
+/** Bit order, spelled out (no Object.keys: key order is a determinism hazard on the DON). */
+const REASON_ORDER: ReasonName[] = [
+  "NEW_DESTINATION",
+  "OVER_BUDGET",
+  "BLOCKLISTED_DEST",
+  "VELOCITY_1H",
+  "VELOCITY_24H",
+  "VELOCITY_7D",
+  "OFF_HOURS",
+  "NO_APPROVED_PAYOUT",
+  "DELEGATION_CHANGED",
+  "CONFIG_CHANGE_PENDING",
+  "RESERVE_MISMATCH",
+  "ORACLE_STALE",
+  "PRICE_DEVIATION",
+  "API_UNAVAILABLE",
+];
 
 // --- ReportRejected reasons (ADR-0005) ---
 export const REJECT_DECODE = 1;
