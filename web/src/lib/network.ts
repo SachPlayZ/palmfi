@@ -15,13 +15,18 @@ export const network = {
 };
 
 // Explicit wallet list: the default one pulls in the Coinbase SDK and its unresolvable optional deps.
+// WalletConnect-based wallets only appear once a real project id is configured.
+const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 const connectors = connectorsForWallets(
-  [{ groupName: "Wallets", wallets: [metaMaskWallet, rainbowWallet, injectedWallet, walletConnectWallet] }],
-  {
-    appName: "palmfi",
-    // Injected wallets work without one; set a real WalletConnect project id for mobile wallets.
-    projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "palmfi-dev",
-  },
+  [
+    {
+      groupName: "Wallets",
+      wallets: walletConnectProjectId
+        ? [metaMaskWallet, rainbowWallet, injectedWallet, walletConnectWallet]
+        : [injectedWallet],
+    },
+  ],
+  { appName: "palmfi", projectId: walletConnectProjectId ?? "" },
 );
 
 export const wagmiConfig = createConfig({

@@ -34,8 +34,13 @@ abstract contract NetworkTest is Test, SepoliaConfig, NetworkDeployer {
     function setUp() public virtual {
         uint256 forkBlock = vm.envOr("FORK_BLOCK", uint256(0));
         string memory rpc = vm.envOr("SEPOLIA_RPC_URL", DEFAULT_RPC);
-        if (forkBlock == 0) vm.createSelectFork(rpc);
-        else vm.createSelectFork(rpc, forkBlock);
+        if (forkBlock == 0) {
+            // Stay a few blocks behind head: load-balanced public RPCs serve "latest" from nodes that lag.
+            vm.createSelectFork(rpc);
+            vm.rollFork(block.number - 8);
+        } else {
+            vm.createSelectFork(rpc, forkBlock);
+        }
 
         ext = loadExternal();
         net = deployNetwork(ext, deployer);

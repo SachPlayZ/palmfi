@@ -1,42 +1,32 @@
 import { describe, expect } from "bun:test";
-import { newTestRuntime, test } from "@chainlink/cre-sdk/test";
-import { onCronTrigger, initWorkflow } from "./main";
-import type { Config } from "./main";
+import { getNetwork } from "@chainlink/cre-sdk";
+import { addContractMock, EvmMock, newTestRuntime, test } from "@chainlink/cre-sdk/test";
+import { aggregatorV3Abi, initWorkflow, onCronTrigger, type Config } from "./main";
 
-describe("onCronTrigger", () => {
-  test("logs message and returns greeting", async () => {
-    const config: Config = { schedule: "*/5 * * * *" };
+const config: Config = {
+  schedule: "*/30 * * * * *",
+  chainSelectorName: "ethereum-testnet-sepolia",
+  ethUsdFeed: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+};
+
+describe("hello workflow", () => {
+  test("reads ETH/USD from the Sepolia Chainlink feed", async () => {
+    const selector = getNetwork({ chainFamily: "evm", chainSelectorName: config.chainSelectorName })!.chainSelector
+      .selector;
+    const feed = addContractMock(EvmMock.testInstance(selector), { address: config.ethUsdFeed, abi: aggregatorV3Abi });
+    feed.decimals = () => 8;
+    feed.latestRoundData = () => [1n, 222359000000n, 0n, 1_700_000_000n, 1n];
+
     const runtime = newTestRuntime();
     runtime.config = config;
 
-    const result = onCronTrigger(runtime);
-
-    expect(result).toBe("Hello world!");
-    const logs = runtime.getLogs();
-    expect(logs).toContain("Hello world! Workflow triggered.");
+    expect(onCronTrigger(runtime)).toBe("ETH/USD 2223.59");
   });
-});
 
-describe("initWorkflow", () => {
-  test("returns one handler with correct cron schedule", async () => {
-    const testSchedule = "0 0 * * *";
-    const config: Config = { schedule: testSchedule };
-
+  test("registers one cron handler on the configured schedule", async () => {
     const handlers = initWorkflow(config);
 
-    expect(handlers).toBeArray();
     expect(handlers).toHaveLength(1);
-    expect(handlers[0].trigger.config.schedule).toBe(testSchedule);
-  });
-
-  test("handler executes onCronTrigger and returns result", async () => {
-    const config: Config = { schedule: "*/5 * * * *" };
-    const runtime = newTestRuntime();
-    runtime.config = config;
-    const handlers = initWorkflow(config);
-
-    const result = handlers[0].fn(runtime, {});
-
-    expect(result).toBe(onCronTrigger(runtime));
+    expect(handlers[0].trigger.config.schedule).toBe(config.schedule);
   });
 });
