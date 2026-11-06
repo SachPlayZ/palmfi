@@ -1,0 +1,11 @@
+# Vercel builds web/ only; it reads config/, deployments/, cre/sentinel/config.staging.json from root
+/contracts
+/docs
+/tasks
+/scripts
+cre/**/node_modules
+cre/**/dist
+**/node_modules
+web/.next
+.env
+.env.*

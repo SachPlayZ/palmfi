@@ -15,3 +15,4 @@ cre/**/dist/
 .DS_Store
 *.tsbuildinfo
 cre/**/.cre_build_tmp.js
+.vercel
