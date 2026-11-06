@@ -11,6 +11,7 @@ import {Vault} from "../../src/Vault.sol";
 import {VaultModule} from "../../src/VaultModule.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
 import {ProtectedToken} from "../../src/tokens/ProtectedToken.sol";
+import {UniswapDeployer, UniswapDeployment} from "./UniswapDeployer.sol";
 
 /// palmfi contracts deployed on top of External.
 struct Deployment {
@@ -26,6 +27,7 @@ struct Deployment {
     address ensUserRegistry;
     address ensResolver;
     bool ensAttached;
+    UniswapDeployment uni; // VaultHook, PaymentRouter, Safe-harbor swapper, TJAR, seeded pools
 }
 
 struct EnsGrant {
@@ -55,7 +57,7 @@ interface IEthRegistry {
 /// Single deploy path shared by the Sepolia deploy script and the fork test base,
 /// so tests always exercise exactly what ships. Must run with `deployer` as the sender
 /// (broadcast in the script, prank in tests); the deployer must own the ENS parent name.
-abstract contract NetworkDeployer {
+abstract contract NetworkDeployer is UniswapDeployer {
     string internal constant PARENT_LABEL = "palmfi";
     uint256 internal constant ENS_ALL_ROLES = 0x1111111111111111111111111111111111111111111111111111111111111111;
     uint256 internal constant REG_ROLE_REGISTRAR = 1 << 0;
@@ -134,6 +136,8 @@ abstract contract NetworkDeployer {
         }
         res.grantRootRoles(RES_ROLE_SET_ADDRESS, d.factory);
         res.grantSetterRoles(_textSetter("status"), d.hub);
+
+        d.uni = deployUniswap(e, deployer, d.factory, d.hub, d.safetyFund);
     }
 
     function _textSetter(string memory key) internal pure returns (bytes memory) {

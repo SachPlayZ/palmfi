@@ -62,9 +62,17 @@ abstract contract NetworkTest is Test, SepoliaConfig, NetworkDeployer {
 
         ext = loadExternal();
         deployer = ext.ensParentOwner; // the deployer owns palmfi.eth
+        _fundSeedLiquidity();
         vm.startPrank(deployer, deployer);
         net = deployNetwork(ext, deployer);
         vm.stopPrank();
+    }
+
+    /// Real tokens for the deploy helper's seeded WETH/USDC and LINK/USDC pools (the deployer seeds them).
+    function _fundSeedLiquidity() internal virtual {
+        deal(ext.usdc, deployer, 100e6);
+        deal(ext.link, deployer, 50e18);
+        fundWeth(deployer, 1 ether);
     }
 
     uint256 internal constant FEE = 0.001 ether;

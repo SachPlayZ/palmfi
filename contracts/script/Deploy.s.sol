@@ -31,6 +31,19 @@ contract Deploy is Script, SepoliaConfig, NetworkDeployer {
         vm.serializeAddress(k, "ensUserRegistry", d.ensUserRegistry);
         vm.serializeAddress(k, "ensResolver", d.ensResolver);
         vm.serializeBool(k, "ensAttached", d.ensAttached);
+        vm.serializeAddress(k, "vaultHook", d.uni.hook);
+        vm.serializeAddress(k, "paymentRouter", d.uni.paymentRouter);
+        vm.serializeAddress(k, "safeHarborSwapper", d.uni.safeHarborSwapper);
+        vm.serializeAddress(k, "poolSeeder", d.uni.poolSeeder);
+        vm.serializeAddress(k, "jarFeeController", d.uni.jarFeeController);
+        vm.serializeAddress(k, "jarFactory", d.uni.jarFactory);
+        vm.serializeAddress(k, "tokenJar", d.uni.tokenJar);
+        vm.serializeAddress(k, "jarReleaser", d.uni.jarReleaser);
+        vm.serializeUint(k, "wethUsdcFee", d.uni.wethUsdcKey.fee);
+        vm.serializeInt(k, "wethUsdcTickSpacing", d.uni.wethUsdcKey.tickSpacing);
+        vm.serializeUint(k, "linkUsdcFee", d.uni.linkUsdcKey.fee);
+        vm.serializeInt(k, "linkUsdcTickSpacing", d.uni.linkUsdcKey.tickSpacing);
+        vm.serializeBool(k, "poolsSeeded", d.uni.seeded);
         string memory json = vm.serializeAddress(k, "deployer", d.deployer);
         vm.writeJson(json, OUT);
     }
