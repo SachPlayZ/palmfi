@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:arc": "next dev -p 5173",
+    "predev:arc": "node scripts/sync-deployments.mjs",
     "predev": "node scripts/sync-deployments.mjs",
     "build": "next build",
     "prebuild": "node scripts/sync-deployments.mjs",

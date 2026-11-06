@@ -29,6 +29,10 @@ abstract contract VaultBase {
     uint256 public constant HISTORY = 32;
     /// Longest delay any setting may impose, so every request can still execute inside REQUEST_TTL.
     uint32 public constant MAX_DELAY_LIMIT = 5 days;
+    /// Lifeline: outstanding (pending + drawn) at most this share of the frozen reserves, in bps.
+    uint256 public constant LIFELINE_CAP_BPS = 2_000;
+    /// Lifeline fee to the payee whose pool float fronted the payment, in bps of the principal.
+    uint256 public constant LIFELINE_FEE_BPS = 50;
 
     struct Request {
         address destination; // outside address (UNWRAP) or payee Vault (PAYMENT)
@@ -83,6 +87,9 @@ abstract contract VaultBase {
     error NotCancellable();
     /// CRE is live: request the outflow instead (it clears at zero delay when it fits the Instant budget).
     error UseRequest();
+    error NotFrozen();
+    error UnknownPayee(address payeeVault);
+    error OverLifelineCap(uint256 requested, uint256 room);
 
     IVaultFactory public factory;
     IHub public hub;
@@ -133,6 +140,29 @@ abstract contract VaultBase {
     T.Outflow[32] internal _history;
     uint256 public historyCount;
     mapping(address => uint256) public destinationCount;
+
+    /// Lifeline (ADR-0013): payments to a known counterparty while Frozen, fronted by the Orbital pool and repaid
+    /// from these reserves once the freeze resolves. The escrow is burned at proposal, so this much USDC sits
+    /// above the token supply, reserved for the pool, until the hook repays it.
+    struct Lifeline {
+        address payee; // payee Vault: one this Vault already paid (history), never chosen by the vote
+        address proposer;
+        uint128 amount;
+        uint128 fee;
+        uint64 createdAt;
+        uint16 voterCount;
+        uint16 yes;
+        bool keyApproved;
+        uint8 state; // 1 pending, 2 drawn, 3 cancelled
+    }
+
+    uint256 public nextLifelineId;
+    mapping(uint256 => Lifeline) internal _lifelines;
+    mapping(uint256 => mapping(address => bool)) public hasVotedLifeline;
+    /// Escrowed by pending Lifelines (burned tokens, not yet drawn).
+    uint256 public lifelinePending;
+    /// Drawn from the pool and not yet repaid (principal + fee), USDC 6dp.
+    uint256 public lifelineDebt;
 
     struct Wiring {
         address hub;
@@ -259,7 +289,8 @@ abstract contract VaultBase {
         }
         // Tokens still outside the wallets (pool, settlement) stay backed, so other orgs can settle them later.
         uint256 bal = IERC20(usdc).balanceOf(address(this));
-        uint256 keep = t.totalSupply();
+        // ...and the Lifeline debt the pool fronted: it is repaid from here, never from the Recovery vault.
+        uint256 keep = t.totalSupply() + lifelineDebt;
         if (bal > keep) IERC20(usdc).safeTransfer(recoveryVault, bal - keep);
         hub.vaultMigrated(recoveryVault);
     }
