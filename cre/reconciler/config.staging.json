@@ -11,7 +11,8 @@
   "vaultPageSize": 50,
   "scoring": {
     "k": 2500,
-    "sFlag": 18000
+    "sFlag": 18000,
+    "sQuiet": 2500
   },
   "notifyDelaySeconds": 21600,
   "notify": {

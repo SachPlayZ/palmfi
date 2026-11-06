@@ -1,6 +1,6 @@
 # Uniswap v4 developer feedback
 
-From building palmfi's **Orbital pool**: an N-token AMM (Paradigm's Orbital, single-sphere step) as one v4 hook on Arc testnet. Code: [`contracts/src/orbital/`](contracts/src/orbital).
+From building palmfi's **Orbital pool**: an N-token AMM (Paradigm's Orbital with ticks: nested spherical caps consolidated into a torus invariant) as one v4 hook on Arc testnet. Code: [`contracts/src/orbital/`](contracts/src/orbital).
 
 ## What worked well
 
@@ -19,7 +19,10 @@ From building palmfi's **Orbital pool**: an N-token AMM (Paradigm's Orbital, sin
 6. **Deployments on newer chains.** On Arc we found the PoolManager through a third-party listing and verified it onchain ourselves; the Universal Router wasn't listed, so we shipped a minimal router. An official per-chain address page covering Arc would remove the guesswork.
 7. **Parameters that don't apply to a NoOp curve are still required**: `sqrtPriceLimitX96`, the initial price, and `tickSpacing`. Our facades initialize at 1:1 and swap with MIN/MAX price limits only to satisfy validation. A NoOp mode that skips them would make intent clearer.
 
+8. **Non-CPMM curves with iterative solvers fight the gas model.** Solving the tick torus on-chain is a bisection of a quartic-shaped residual (≈10–40 `sqrt`s per swap). A hook-side `quote` that the router and the PoolManager's `swap` both trust, or a documented pattern for view-only quoting of NoOp curves, would help; we had to expose our own `quote()` and keep it in sync with `beforeSwap`.
+
 ## Numbers
 
-- `OrbitalHook` 12.9 KB runtime, `OrbitalRouter` 3.4 KB.
+- `OrbitalHook` 18.4 KB runtime (with the tick solver), `OrbitalRouter` 3.4 KB.
+- Swap gas (forge fork, includes PoolManager + router): ≈0.39M on the plain sphere, ≈0.69M when tight ticks hold liquidity.
 - 14 Orbital tests (swaps both directions, exact in/out, frozen-token halt, settlement, LP add/remove, fuzzed invariant) plus audit regressions, on an Arc fork against the live PoolManager.

@@ -4,11 +4,16 @@
  *
  *   S = S_amount + S_dest + S_time + S_velocity + S_flags      (wallet scope and Vault scope; take the max)
  *   delay = clamp(Floor · 2^(S/k), Floor, MaxDelay); over the Hard cap ≥ CapDelay; S ≥ S_flag → FLAG
+ *   quiet lane: amount ≤ the onboarding threshold (usualMaxPayout) and S < S_quiet → delay 0. The Vault honours
+ *   0 only within its Instant budget (and spends it), so this can never release more than the budget.
+ *
+ * Every outflow is a request while CRE is live, small ones included, so S_velocity sees a burst of small
+ * transfers (smurfing) before any of them pays out.
  *
  * Pure and integer-only (bigint fixed point, milli-bits): every DON node must reach the same bytes.
  * Everything is measured at the request's own createdAt, so a late re-score (Reconciler) gives the same answer.
  */
-import { BLOCKLISTED_DEST, CONFIG_CHANGE_PENDING, CRE_SILENT, NEW_DESTINATION, NEW_WALLET, OFF_HOURS, OVER_HARD_CAP, UNUSUAL_AMOUNT, VELOCITY } from "./deviation-codes";
+import { KIND_SWAP, BLOCKLISTED_DEST, CONFIG_CHANGE_PENDING, CRE_SILENT, NEW_DESTINATION, NEW_WALLET, OFF_HOURS, OVER_HARD_CAP, UNUSUAL_AMOUNT, VELOCITY } from "./deviation-codes";
 
 type Hex = `0x${string}`;
 
@@ -54,8 +59,11 @@ export type Params = {
   k: number;
   /** Score at or above which the request is FLAGged (milli-bits). */
   sFlag: number;
+  /** Below this total, a request within the onboarding threshold clears at zero delay (milli-bits). */
+  sQuiet?: number;
 };
-export const DEFAULT_PARAMS: Params = { k: 2500, sFlag: 28000 };
+export const DEFAULT_PARAMS: Params = { k: 2500, sFlag: 28000, sQuiet: 2500 };
+const DEFAULT_QUIET = 2500n;
 
 /** Per-term milli-bits, carried to notifications and the UI ("+9 bits: new destination"). */
 export type Terms = { amount: number; dest: number; time: number; velocity: number; flags: number };
@@ -133,11 +141,15 @@ const inBizHours = (h: number, start: number, end: number) =>
 type History = ScoringContext["history"];
 
 /**
- * Robust z of log2(amount) over the scope's history (median / MAD), Laplace surprisal: bits = (l − median) / MAD.
- * Only upward deviation counts: smaller-than-usual is not an attack signature. Cold start: the profile's
- * usual max payout is the 2σ point (median = usual/2, MAD = 1 bit).
+ * Amount surprisal. Zero at or below the onboarding threshold (usualMaxPayout): small payments carry no amount
+ * surprise. Above it, the robust z of log2(amount) over the scope's history (median / MAD), Laplace surprisal,
+ * measured from the higher of the history median and the threshold, so it starts at 0 at the threshold and grows
+ * smoothly (bits = (l − base) / MAD). Only upward deviation counts. Cold start: base = threshold, MAD = 1 bit
+ * (one bit per doubling past the threshold).
  */
 const amountTerm = (amount: bigint, hist: History, p: ScoringContext["profile"]): bigint | undefined => {
+  const threshold = p.usualMaxPayout;
+  if (threshold > 0n && amount <= threshold) return 0n;
   const l = log2Milli(amount < 1n ? 1n : amount);
   let med: bigint;
   let mad: bigint;
@@ -148,9 +160,10 @@ const amountTerm = (amount: bigint, hist: History, p: ScoringContext["profile"])
   } else {
     const usual = p.usualMaxPayout > 0n ? p.usualMaxPayout : p.hardCap;
     if (usual === 0n) return undefined; // no baseline at all → caller falls back to MaxDelay
-    med = log2Milli(usual) - 1000n;
+    med = log2Milli(usual);
     mad = 1000n;
   }
+  if (threshold > 0n && log2Milli(threshold) > med) med = log2Milli(threshold);
   if (mad < MAD_FLOOR) mad = MAD_FLOOR;
   return l > med ? ((l - med) * 1000n) / mad : 0n;
 };
@@ -219,7 +232,11 @@ const scope = (ctx: ScoringContext, hist: History, vaultWide: boolean) => {
   const r = ctx.request;
   const amount = amountTerm(r.amount, hist, ctx.profile);
   // destinationCount is Vault-wide all-time, so it only vouches at Vault scope
-  const dest = destTerm(r.destination, hist, ctx.knownDestination, vaultWide && ctx.destinationCount > 0n);
+  // A pool swap's destination is the hook; the real payee is a palmfi Vault wallet (token-level whitelist).
+  const dest =
+    r.kind === KIND_SWAP
+      ? { bits: 0n, isNew: false }
+      : destTerm(r.destination, hist, ctx.knownDestination, vaultWide && ctx.destinationCount > 0n);
   const time = timeTerm(r.createdAt, hist, ctx.profile);
   const velocity = velocityTerm(r.createdAt, hist);
   let flags = 0n;
@@ -267,6 +284,10 @@ export const assess = (ctx: ScoringContext, params: Params = DEFAULT_PARAMS): As
     delay = raw < floor ? floor : raw > max ? max : raw;
   }
   if ((codes & OVER_HARD_CAP) !== 0n && delay < BigInt(p.capDelay)) delay = BigInt(p.capDelay);
+  // Quiet lane: within the threshold and nothing else surprising → no wait (the Vault caps it at the budget).
+  const quiet = params.sQuiet !== undefined ? BigInt(params.sQuiet) : DEFAULT_QUIET;
+  const withinThreshold = p.usualMaxPayout > 0n && r.amount <= p.usualMaxPayout;
+  if (!flag && !vaultS.blind && withinThreshold && (codes & OVER_HARD_CAP) === 0n && total < quiet) delay = 0n;
 
   return { action: flag ? "FLAG" : "DELAY", score: Number(total), delay, reasonCodes: codes, scope: win.name, terms: win.s.terms };
 };

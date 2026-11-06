@@ -36,6 +36,19 @@ export const orbitalHookAbi = [
   },
   {
     "type": "function",
+    "name": "DEFAULT_TICK",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_TOKENS",
     "inputs": [],
     "outputs": [
@@ -46,6 +59,29 @@ export const orbitalHookAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "addLiquidity",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "tick",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -880,6 +916,57 @@ export const orbitalHookAbi = [
   },
   {
     "type": "function",
+    "name": "fitTicks",
+    "inputs": [
+      {
+        "name": "t",
+        "type": "tuple",
+        "internalType": "struct OrbitalTicks.Ticks",
+        "components": [
+          {
+            "name": "sqrtN",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "w",
+            "type": "uint256[10]",
+            "internalType": "uint256[10]"
+          },
+          {
+            "name": "kh",
+            "type": "uint256[10]",
+            "internalType": "uint256[10]"
+          },
+          {
+            "name": "sg",
+            "type": "uint256[10]",
+            "internalType": "uint256[10]"
+          }
+        ]
+      },
+      {
+        "name": "sx",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "sx2",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getHookPermissions",
     "inputs": [],
     "outputs": [
@@ -1136,6 +1223,34 @@ export const orbitalHookAbi = [
   },
   {
     "type": "function",
+    "name": "removeLiquidity",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tick",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "reserveOf",
     "inputs": [
       {
@@ -1191,6 +1306,43 @@ export const orbitalHookAbi = [
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "tickLiquidity",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "tick",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ticksOn",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1419,6 +1571,11 @@ export const orbitalHookAbi = [
   },
   {
     "type": "error",
+    "name": "BadTick",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FrozenToken",
     "inputs": [
       {
@@ -1450,6 +1607,11 @@ export const orbitalHookAbi = [
   },
   {
     "type": "error",
+    "name": "NoWeight",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotPoolManager",
     "inputs": []
   },
@@ -1465,6 +1627,11 @@ export const orbitalHookAbi = [
   },
   {
     "type": "error",
+    "name": "OffTorus",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "OnlyAdmin",
     "inputs": []
   },
@@ -1476,6 +1643,11 @@ export const orbitalHookAbi = [
   {
     "type": "error",
     "name": "PoolNotAllowed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TickExhausted",
     "inputs": []
   },
   {

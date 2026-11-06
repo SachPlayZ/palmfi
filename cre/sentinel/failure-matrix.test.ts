@@ -61,12 +61,17 @@ describe("failure matrix (brief §7.4)", () => {
     expect(sentinel(c, queuedLog(ADDR.alice, r))).toContain("SKIP_HASH_MISMATCH");
   });
 
-  test("4. compromised CRE → the model itself never goes below Floor, and ≥ CapDelay over the Hard cap", () => {
+  test("4. compromised CRE → below Floor only in the quiet lane (≤ threshold); ≥ CapDelay over the Hard cap", () => {
+    // The model's zero delay is only for a quiet request within the onboarding threshold; the Vault honours it
+    // only within the Instant budget (Foundry CreLive.t.sol), so a compromised CRE releases no more than the budget.
     const v = fakeVault();
+    const threshold = v.profile.usualMaxPayout;
     v.requests.set(1n, request({ amount: USD(1) }));
     v.requests.set(2n, request({ amount: USD(60_000), destination: ADDR.friend }));
-    expect(assess(contextOf(v, 1n)).delay).toBeGreaterThanOrEqual(BigInt(v.profile.floorDelay));
+    v.requests.set(3n, request({ amount: threshold + USD(1) }));
+    expect(assess(contextOf(v, 1n)).delay).toBeGreaterThanOrEqual(0n);
     expect(assess(contextOf(v, 2n)).delay).toBeGreaterThanOrEqual(BigInt(v.profile.capDelay));
+    expect(assess(contextOf(v, 3n)).delay).toBeGreaterThanOrEqual(BigInt(v.profile.floorDelay));
   });
 
   test("5. baseline poisoning → a few planted outliers don't move the robust (median/MAD) baseline", () => {

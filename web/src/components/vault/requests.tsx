@@ -69,7 +69,8 @@ function RequestRow({ v, r }: { v: VaultView; r: VaultRequest }) {
           <span className="text-xs text-[var(--subtle)]">#{r.id.toString()}</span>
           <span className="tabular font-semibold">{formatUsd(r.amount)}</span>
           <span className="text-sm">
-            {r.kind === KIND.PAYMENT ? "pay Vault" : "unwrap to"} <Mono>{short(r.destination)}</Mono>
+            {r.kind === KIND.SWAP ? "pool swap clearance" : r.kind === KIND.PAYMENT ? "pay Vault" : "unwrap to"}{" "}
+            {r.kind !== KIND.SWAP && <Mono>{short(r.destination)}</Mono>}
           </span>
           <span className="text-xs text-[var(--subtle)]">by {short(r.requester)}</span>
         </div>
@@ -110,7 +111,8 @@ function RequestRow({ v, r }: { v: VaultView; r: VaultRequest }) {
             Cancel
           </Button>
         )}
-        {pending && t.ready && (
+        {pending && t.ready && r.kind === KIND.SWAP && <span className="text-xs text-[var(--subtle)]">Cleared: pay from the Orbital pool card</span>}
+        {pending && t.ready && r.kind !== KIND.SWAP && (
           <Button onClick={() => send("execute", [r.id], "Execute")} disabled={tx.busy || !outflowsOpen(v)}>
             {outflowsOpen(v) ? "Execute" : `Execute (Vault ${statusLabel(v)})`}
           </Button>

@@ -8,3 +8,5 @@ export const NEW_WALLET = 1n << 5n;
 export const BLOCKLISTED_DEST = 1n << 6n;
 export const OVER_HARD_CAP = 1n << 9n;
 export const CRE_SILENT = 1n << 10n;
+/** Pre-cleared Orbital pool swap-in request kind (mirrors cre/shared/palm.ts). */
+export const KIND_SWAP = 2;
