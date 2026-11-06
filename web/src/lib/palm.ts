@@ -159,3 +159,13 @@ export function parseTokensRecord(rec: string | null | undefined): { symbol: str
     })
     .filter((t) => t.symbol && /^0x[0-9a-fA-F]{40}$/.test(t.address));
 }
+
+/** DNS wire-format name (\x05alice\x06palmfi\x03eth\x00) → "alice.palmfi.eth". */
+export function decodeDnsName(hex: string): string {
+  const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const b = new Uint8Array(h.length / 2);
+  for (let i = 0; i < b.length; i++) b[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+  const parts: string[] = [];
+  for (let i = 0; i < b.length && b[i] !== 0; i += b[i] + 1) parts.push(new TextDecoder().decode(b.subarray(i + 1, i + 1 + b[i])));
+  return parts.join(".");
+}

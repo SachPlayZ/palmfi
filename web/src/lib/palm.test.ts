@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeReasonCodes, formatUsd, labelFromName, parseTokensRecord, parseUsd } from "./palm";
+import { decodeDnsName, decodeReasonCodes, formatUsd, labelFromName, parseTokensRecord, parseUsd } from "./palm";
 
 describe("palm helpers", () => {
   it("decodes the reason code bitmap", () => {
@@ -26,5 +26,9 @@ describe("palm helpers", () => {
       parseTokensRecord("pUSDC:0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238,pWETH:0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"),
     ).toHaveLength(2);
     expect(parseTokensRecord("")).toEqual([]);
+  });
+
+  it("decodes DNS wire names", () => {
+    expect(decodeDnsName("0x05616c6963650670616c6d666903657468" + "00")).toBe("alice.palmfi.eth");
   });
 });
