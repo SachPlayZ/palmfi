@@ -21,6 +21,15 @@ contract Deploy is Script, SepoliaConfig, NetworkDeployer {
         string memory k = "deployment";
         vm.serializeUint(k, "chainId", block.chainid);
         vm.serializeUint(k, "blockNumber", d.blockNumber);
+        vm.serializeAddress(k, "hub", d.hub);
+        vm.serializeAddress(k, "registry", d.registry);
+        vm.serializeAddress(k, "safetyFund", d.safetyFund);
+        vm.serializeAddress(k, "approvalBook", d.approvalBook);
+        vm.serializeAddress(k, "factory", d.factory);
+        vm.serializeAddress(k, "vaultImpl", d.vaultImpl);
+        vm.serializeAddress(k, "tokenImpl", d.tokenImpl);
+        vm.serializeAddress(k, "ensUserRegistry", d.ensUserRegistry);
+        vm.serializeAddress(k, "ensResolver", d.ensResolver);
         string memory json = vm.serializeAddress(k, "deployer", d.deployer);
         vm.writeJson(json, OUT);
     }
