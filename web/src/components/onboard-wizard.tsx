@@ -11,11 +11,16 @@ import { arcTestnet } from "@/lib/network";
 import { DEMO_DEFAULTS, MIN_WALLETS, formatDuration, isValidName, parseUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { AddressChip, CopyButton, HillsBand, OrgCard, PageHead, Steps, useOrigin } from "./brand";
+import { AddressChip, CopyButton, HillsBand, OrgCard, Steps, useOrigin } from "./brand";
 import { TelegramLink } from "./telegram-link";
 import { Badge, Button, Field, Input, Notice } from "./ui";
 
-const STEP_LABELS = ["Name", "Voters", "Recovery", "Limits", "Profile", "Review"];
+export type VaultKind = "institution" | "individual";
+
+const ORG_STEPS = ["Organisation", "Voters", "Recovery", "Limits", "Profile", "Review"];
+const SOLO_STEPS = ["Your name", "Devices", "Recovery", "Review"];
+/** Individual vaults use the brief's fixed Individual parameters (§6.7). */
+const SOLO_LIMITS = { b24: "500", b7: "2000", cap: "5000", floor: "15", max: "72", capH: "24" };
 
 const PRESETS = [
   {
@@ -154,8 +159,11 @@ function delayFor(bits: number, floorS: number, maxS: number) {
   return Math.min(maxS, floorS * Math.pow(2, bits / k));
 }
 
-export function OnboardWizard() {
+export function OnboardWizard({ kind, onClose }: { kind: VaultKind; onClose: () => void }) {
   const params = useSearchParams();
+  const solo = kind === "individual";
+  const LABELS = solo ? SOLO_STEPS : ORG_STEPS;
+  const LAST = LABELS.length - 1;
   const { address } = useAccount();
   const tx = useTx();
   const [step, setStep] = useState(0);
@@ -166,27 +174,23 @@ export function OnboardWizard() {
   const [recoveryKey, setRecoveryKey] = useState("");
   const [preset, setPreset] = useState<(typeof PRESETS)[number]["k"]>("demo");
   const p0 = PRESETS.find((p) => p.k === preset)!;
-  const [lim, setLim] = useState({
-    b24: p0.b24 as string,
-    b7: p0.b7 as string,
-    cap: p0.cap as string,
-    floor: p0.floor as string,
-    max: p0.max as string,
-    capH: p0.capH as string,
-  });
+  const [lim, setLim] = useState<Record<"b24" | "b7" | "cap" | "floor" | "max" | "capH", string>>(
+    solo ? SOLO_LIMITS : { b24: p0.b24, b7: p0.b7, cap: p0.cap, floor: p0.floor, max: p0.max, capH: p0.capH },
+  );
   const [custom, setCustom] = useState(false);
-  const [biz, setBiz] = useState({ start: "9", end: "17" });
-  const [usual, setUsual] = useState<string>(p0.usual);
+  const [biz, setBiz] = useState(solo ? { start: "0", end: "24" } : { start: "9", end: "17" });
+  const [usual, setUsual] = useState<string>(solo ? "500" : p0.usual);
   const [dests, setDests] = useState<string[]>([]);
 
   useEffect(() => {
     if (address && !wallets.some((w) => eqA(w, address))) setWallets((w) => [address, ...w]);
   }, [address, wallets]);
   useEffect(() => {
+    if (solo) return;
     const p = PRESETS.find((x) => x.k === preset)!;
     setLim({ b24: p.b24, b7: p.b7, cap: p.cap, floor: p.floor, max: p.max, capH: p.capH });
     setUsual(p.usual);
-  }, [preset]);
+  }, [preset, solo]);
 
   const taken = useReadContract({
     address: deployments.hub,
@@ -223,15 +227,17 @@ export function OnboardWizard() {
         ? "Usual max payout must be positive"
         : undefined,
   };
-  const ok = (s: number) => !errs[s];
+  // Individuals skip the Limits and Profile panes (logical 3 and 4).
+  const PANES = solo ? [0, 1, 2, 5] : [0, 1, 2, 3, 4, 5];
+  const ok = (s: number) => !errs[PANES[s]];
   const go = (s: number) => {
     setDir(s > step ? 1 : -1);
     setStep(s);
   };
-  const next = () => ok(step) && go(Math.min(5, step + 1));
+  const next = () => ok(step) && go(Math.min(LAST, step + 1));
 
   async function submit() {
-    if (!deployments.factory || [0, 1, 2, 3, 4].some((s) => !ok(s))) return;
+    if (!deployments.factory || [0, 1, 2, 3, 4].some((s) => !!errs[s])) return;
     const cfg = {
       wallets: wallets as Address[],
       recoveryKey: (recoveryKey || zeroAddress) as Address,
@@ -259,40 +265,41 @@ export function OnboardWizard() {
   ];
 
   const panes: ReactNode[] = [
-    <div key="0" className="grid items-center gap-10 md:grid-cols-[1fr_auto]">
-      <div className="flex flex-col gap-4">
-        <h2 className="pf-h2">What should other orgs call you?</h2>
-        <p className="pf-lede">Your name is how other orgs pay you, and how your team finds the vault. First come, first served.</p>
+    <div key="0" className="flex flex-col gap-5">
+      <PaneHead
+        title={solo ? "Choose your palmfi name" : "Name your organisation"}
+        body={solo ? "Friends and teams pay you by this name, so pick one you'll keep." : "Other organisations pay you by this name, and your team uses it to find the vault."}
+      />
+      <Field label={solo ? "Name" : "Organisation name"} hint="Lowercase letters, digits and hyphens. First come, first served.">
         <Input
-          big
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
-          placeholder="northwind"
+          placeholder={solo ? "alice" : "northwind"}
           aria-label="Vault name"
           onKeyDown={(e) => e.key === "Enter" && next()}
+          bad={!!name && !isValidName(name)}
         />
-        <span className="flex h-6 items-center gap-2 text-[13px]">
-          {isValidName(name) && taken.isSuccess && (owner ? <Badge tone="red">taken</Badge> : <Badge tone="green">available</Badge>)}
-          {name && !isValidName(name) && <span className="text-[var(--red)]">Lowercase letters, digits and hyphens only</span>}
-          {isValidName(name) && !owner && <span className="pf-dim">Your token will be {name}USDC</span>}
-        </span>
-      </div>
-      <div className="hidden justify-center md:flex" key={name}>
-        <span style={{ animation: "pf-pop .7s var(--ease) both" }}>
-          <OrgCard name={name || "your-org"} width={190} tilt />
-        </span>
+      </Field>
+      <div className="flex min-h-6 flex-wrap items-center gap-2 text-[13px]">
+        {isValidName(name) && taken.isSuccess && (owner ? <Badge tone="red">taken</Badge> : <Badge tone="green">available</Badge>)}
+        {isValidName(name) && !owner && (
+          <span className="pf-dim">
+            Pay link <span className="font-mono text-[var(--ink)]">palmfi/{name}</span> · token <span className="font-mono text-[var(--ink)]">{name}USDC</span>
+          </span>
+        )}
       </div>
     </div>,
     <div key="1" className="flex flex-col gap-5">
-      <h2 className="pf-h2">Who votes?</h2>
-      <p className="pf-lede">
-        {!address && (
-          <span className="mb-2 block text-[14px] text-[var(--subtle)]">Connect your wallet to add it automatically, or paste every voter here.</span>
-        )}
-        Each wallet gets one vote. More than half of the others can veto a payment; more than half of everyone can fast-track it. Use wallets held by different
-        people, on different machines.
-      </p>
+      <PaneHead
+        title={solo ? "Add your devices" : "Who approves big payments?"}
+        body={
+          solo
+            ? "Add at least three wallets you control on separate devices, for example this wallet, a phone passkey and a hardware wallet. If one is lost or compromised, the other two still decide."
+            : "Add a wallet for each approver. Each gets one vote: a majority of the others can decline a payment, a majority of everyone can approve it early. Use wallets held by different people."
+        }
+      />
+      {!address && <Notice tone="amber">Connect your wallet to add it automatically, or paste every address here.</Notice>}
       <AddressList list={wallets} setList={setWallets} locked={address} placeholder="Paste addresses, separated by spaces or commas" />
       <div className="flex items-center gap-3 text-[13px] text-[var(--subtle)]">
         <span className="inline-flex gap-1.5">
@@ -310,11 +317,10 @@ export function OnboardWizard() {
       </div>
     </div>,
     <div key="2" className="flex flex-col gap-6">
-      <h2 className="pf-h2">Where does rescued money go?</h2>
-      <p className="pf-lede">
-        If the vault is ever compromised, everything can only move to this address. It is fixed now and changing it takes seven days, so no attacker can
-        redirect it.
-      </p>
+      <PaneHead
+        title="Set a recovery address"
+        body="If the vault is ever paused, funds can only move here. Changing it later takes seven days' notice."
+      />
       <div className="pf-grid2">
         <Field label="Recovery vault (required)" hint="A cold wallet or multisig nobody uses day to day.">
           <Input
@@ -335,10 +341,10 @@ export function OnboardWizard() {
           />
         </Field>
       </div>
-      <Notice tone="amber">Double-check the recovery vault. It is the one destination nobody, including your own voters, can change quickly.</Notice>
+      <Notice tone="amber">Double-check this address. Nobody, including your own approvers, can change it quickly.</Notice>
     </div>,
     <div key="3" className="flex flex-col gap-6">
-      <h2 className="pf-h2">How much can leave without a wait?</h2>
+      <PaneHead title="Spending limits" body="Payments inside the instant budget go out at once. Anything above it gets a short review." />
       <div className="pf-grid3">
         {PRESETS.map((p) => (
           <Choice key={p.k} on={preset === p.k && !custom} onClick={() => (setPreset(p.k), setCustom(false))} title={p.label} body={p.d}>
@@ -396,8 +402,7 @@ export function OnboardWizard() {
       </div>
     </div>,
     <div key="4" className="flex flex-col gap-6">
-      <h2 className="pf-h2">Teach the Sentinel what normal looks like.</h2>
-      <p className="pf-lede">The Sentinel compares every payment to your vault&apos;s history. Until there is history, these give it a baseline.</p>
+      <PaneHead title="Spending profile" body="palmfi compares every payment with your usual pattern. These answers give it a starting point." />
       <div className="pf-grid3">
         <Field label="Business hours start (UTC)">
           <Input inputMode="numeric" value={biz.start} onChange={(e) => setBiz({ ...biz, start: e.target.value })} />
@@ -426,96 +431,90 @@ export function OnboardWizard() {
         <AddressList list={dests} setList={setDests} placeholder="Paste payee addresses" />
       </Field>
     </div>,
-    <div key="5" className="grid gap-10 md:grid-cols-[auto_1fr]">
-      <OrgCard name={name} width={170} tilt />
-      <div className="flex flex-col gap-6">
-        <h2 className="pf-h2">
-          Ready to create <em>{name}</em>?
-        </h2>
-        <dl className="pf-kv">
-          <dt>Token</dt>
-          <dd>{name}USDC</dd>
-          <dt>Voters</dt>
-          <dd>{wallets.length} wallets</dd>
-          <dt>Recovery vault</dt>
-          <dd>
-            <AddressChip address={recoveryVault} />
-          </dd>
-          <dt>Instant budget</dt>
-          <dd>
-            ${lim.b24} / 24h · ${lim.b7} / 7d
-          </dd>
-          <dt>Hard cap</dt>
-          <dd>${lim.cap}</dd>
-          <dt>Floor · cap delay · max</dt>
-          <dd>
-            {lim.floor} min · {lim.capH}h · {lim.max}h
-          </dd>
-          <dt>Business hours</dt>
-          <dd>
-            {biz.start}:00–{biz.end}:00 UTC
-          </dd>
-        </dl>
-        <p className="text-[14px] text-[var(--subtle)]">One transaction creates the vault, its token, its seat in the Orbital pool and its name.</p>
-        <div>
-          {address ? (
-            <Button size="lg" onClick={submit} busy={tx.busy} disabled={tx.busy || !deployments.factory}>
-              Create {name}
-            </Button>
-          ) : (
-            <div className="flex flex-col items-start gap-3">
-              <span className="text-[14px] text-[var(--subtle)]">Connect a wallet to send the create transaction. It also becomes the first voter.</span>
-              <ConnectButton />
-            </div>
-          )}
-          <TxStatus state={tx.state} />
+    <div key="5" className="flex flex-col gap-5">
+      <PaneHead title="Review and create" body="One transaction creates the vault, its token and your name." />
+      <dl className="pf-kv rounded-2xl bg-[var(--paper-2)] p-5">
+        <dt>Name</dt>
+        <dd>{name}</dd>
+        <dt>Token</dt>
+        <dd>{name}USDC</dd>
+        <dt>{solo ? "Devices" : "Approvers"}</dt>
+        <dd>{wallets.length} wallets</dd>
+        <dt>Recovery</dt>
+        <dd>
+          <AddressChip address={recoveryVault} />
+        </dd>
+        <dt>Instant budget</dt>
+        <dd>
+          ${Number(lim.b24).toLocaleString()} / 24h · ${Number(lim.b7).toLocaleString()} / 7d
+        </dd>
+        <dt>Hard cap</dt>
+        <dd>${Number(lim.cap).toLocaleString()}</dd>
+        {!solo && (
+          <>
+            <dt>Business hours</dt>
+            <dd>
+              {biz.start}:00–{biz.end}:00 UTC
+            </dd>
+          </>
+        )}
+      </dl>
+      {address ? (
+        <Button size="lg" onClick={submit} busy={tx.busy} disabled={tx.busy || !deployments.factory}>
+          Create vault
+        </Button>
+      ) : (
+        <div className="flex flex-col items-start gap-3">
+          <span className="text-[14px] text-[var(--subtle)]">Connect a wallet to send the transaction. It also becomes the first {solo ? "device" : "approver"}.</span>
+          <ConnectButton />
         </div>
-      </div>
+      )}
+      <TxStatus state={tx.state} />
     </div>,
   ];
 
   return (
-    <>
-      <PageHead
-        index={params.get("as") === "individual" ? "(Individual vault)" : "(Institution vault)"}
-        title="Set up your vault"
-        em="in six steps."
-        lede="Five minutes, one transaction. You can tighten anything later in a click; loosening takes a vote and a timelock."
-      />
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-col gap-3">
-          <Steps n={6} active={step} onPick={(i) => (i < step || [...Array(i).keys()].every(ok) ? go(i) : undefined)} labels={STEP_LABELS} />
-          <div className="hidden justify-between sm:flex">
-            {STEP_LABELS.map((l, i) => (
-              <button
-                key={l}
-                type="button"
-                className={`pf-mono transition-colors ${i === step ? "text-[var(--ink)]" : "pf-dim"}`}
-                onClick={() => (i < step ? go(i) : undefined)}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+    <div className="flex max-h-[min(88vh,820px)] flex-col">
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-6 pt-5 pb-4 sm:px-8">
+        <div className="flex flex-col gap-1">
+          <span className="pf-mono pf-dim">
+            {solo ? "Individual vault" : "Institution vault"} · Step {step + 1} of {LABELS.length}
+          </span>
+          <h2 className="pf-h3">{LABELS[step]}</h2>
         </div>
-        <section className="pf-card min-h-[420px] overflow-hidden" style={{ padding: "clamp(24px,4vw,48px)" }}>
-          <div key={step} style={{ animation: `${dir > 0 ? "pf-slide-r" : "pf-slide-l"} .6s var(--ease) both` } as CSSProperties}>
-            {panes[step]}
-          </div>
-        </section>
-        <div className="flex items-center justify-between gap-4">
-          <Button variant="ghost" onClick={() => go(Math.max(0, step - 1))} disabled={step === 0}>
-            ← Back
-          </Button>
-          <span className="text-[13px] text-[var(--subtle)]">{step < 5 && errs[step]}</span>
-          {step < 5 && (
-            <Button onClick={next} disabled={!ok(step)}>
-              Continue →
-            </Button>
-          )}
+        <button type="button" className="pf-btn ghost sm" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+      </header>
+      <div className="px-6 pt-4 sm:px-8">
+        <Steps n={LABELS.length} active={step} onPick={(i) => (i < step || [...Array(i).keys()].every(ok) ? go(i) : undefined)} labels={LABELS} />
+      </div>
+      <div className="min-h-[340px] flex-1 overflow-y-auto px-6 py-6 sm:px-8">
+        <div key={step} style={{ animation: `${dir > 0 ? "pf-slide-r" : "pf-slide-l"} .45s var(--ease) both` } as CSSProperties}>
+          {panes[PANES[step]]}
         </div>
       </div>
-    </>
+      <footer className="flex items-center justify-between gap-4 border-t border-[var(--line)] px-6 py-4 sm:px-8">
+        <Button variant="ghost" onClick={() => (step === 0 ? onClose() : go(step - 1))}>
+          {step === 0 ? "Cancel" : "← Back"}
+        </Button>
+        <span className="hidden text-right text-[13px] text-[var(--subtle)] sm:block">{step < LAST && errs[PANES[step]]}</span>
+        {step < LAST && (
+          <Button onClick={next} disabled={!ok(step)}>
+            Continue
+          </Button>
+        )}
+      </footer>
+    </div>
+  );
+}
+
+function PaneHead({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <h3 className="text-[20px] font-medium tracking-[-0.01em]">{title}</h3>
+      <p className="max-w-[60ch] text-[14.5px] leading-[1.5] text-[var(--subtle)]">{body}</p>
+    </div>
   );
 }
 

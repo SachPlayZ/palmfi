@@ -1069,6 +1069,9 @@ export function Meadow() {
   useReveals();
   return (
     <div className="meadow">
+      <Link href="/onboard" className="m-pill m-cta-fixed">
+        Open a vault
+      </Link>
       <main>
         <Hero />
         <Statement />
