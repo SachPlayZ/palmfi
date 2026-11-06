@@ -95,7 +95,8 @@ contract QueuedRequestTest is NetworkTest {
 
     function test_onlyForwarderCanReport() public {
         uint256 id = _request(20e6);
-        bytes memory rep = _rawReport(id, v.getRequest(id).requestHash, T.VERDICT_CLEAR, uint64(block.timestamp + 60), 1);
+        bytes memory rep =
+            _rawReport(id, v.getRequest(id).requestHash, T.VERDICT_CLEAR, uint64(block.timestamp + 60), 1);
         vm.prank(attacker);
         vm.expectRevert(Hub.NotForwarder.selector);
         hub().onReport("", rep);
