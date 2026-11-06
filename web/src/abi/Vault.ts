@@ -227,25 +227,6 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "bondOf",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "budget24h",
     "inputs": [],
     "outputs": [
@@ -1019,25 +1000,6 @@ export const vaultAbi = [
   },
   {
     "type": "function",
-    "name": "requestSwap",
-    "inputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "requestUnwrap",
     "inputs": [
       {
@@ -1379,11 +1341,6 @@ export const vaultAbi = [
   {
     "type": "error",
     "name": "Unauthorized",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "UseRequest",
     "inputs": []
   },
   {

@@ -81,8 +81,6 @@ abstract contract VaultBase {
     error ZeroAmount();
     error BadLimits();
     error NotCancellable();
-    /// CRE is live: request the outflow instead (it clears at zero delay when it fits the Instant budget).
-    error UseRequest();
 
     IVaultFactory public factory;
     IHub public hub;
@@ -121,8 +119,6 @@ abstract contract VaultBase {
     uint256[] internal _open;
     mapping(uint256 => uint256) internal _openIndex; // id => index+1
     mapping(uint256 => mapping(address => bool)) public hasVoted;
-    /// Bond escrowed per request: none when the request fits the Instant budget at creation.
-    mapping(uint256 => uint256) public bondOf;
 
     uint256 public nextChangeId;
     mapping(uint256 => Change) internal _changes;
@@ -149,12 +145,6 @@ abstract contract VaultBase {
 
     modifier outflowsOpen() {
         if (hub.statusOf(address(this)) != T.STATUS_ACTIVE) revert NotActive();
-        _;
-    }
-
-    /// The direct instant lane is only the CRE-down fallback: while CRE is live, every outflow is scored first.
-    modifier creDown() {
-        if (hub.creLive()) revert UseRequest();
         _;
     }
 

@@ -63,8 +63,7 @@ contract Vault is VaultBase {
     // Instant lane
     // ------------------------------------------------------------------
 
-    /// CRE-down fallback only (`creDown`): while CRE is live, use requestUnwrap (zero delay within budget).
-    function unwrap(uint256 amount, address destination) external onlyWallet outflowsOpen creDown {
+    function unwrap(uint256 amount, address destination) external onlyWallet outflowsOpen {
         if (amount == 0) revert ZeroAmount();
         if (hub.isBlocked(destination)) revert Blocklisted(destination);
         _spendInstant(amount);
@@ -75,7 +74,7 @@ contract Vault is VaultBase {
     }
 
     /// Direct vault-to-vault payment within the Instant budget (the Orbital pool is the composable route).
-    function pay(address payeeVault, uint256 amount) external onlyWallet outflowsOpen creDown {
+    function pay(address payeeVault, uint256 amount) external onlyWallet outflowsOpen {
         if (amount == 0) revert ZeroAmount();
         _spendInstant(amount);
         ProtectedToken(token).burn(msg.sender, amount);
@@ -124,12 +123,6 @@ contract Vault is VaultBase {
         return _queue(T.KIND_PAYMENT, amount, payeeVault);
     }
 
-    /// Pre-clear an Orbital pool swap-in of up to `amount`. Nothing is escrowed (the tokens stay in the wallet,
-    /// which can only send them to its own wallets or the pool); once executable, the swap consumes it.
-    function requestSwap(uint256 amount) external returns (uint256) {
-        return _queue(T.KIND_SWAP, amount, factory.hook());
-    }
-
     /// Default delay is MaxDelay: until the Sentinel scores it, the slowest path applies (unsure → slow).
     function _queue(uint8 kind, uint256 amount, address destination)
         internal
@@ -141,20 +134,14 @@ contract Vault is VaultBase {
         if (pendingOf[msg.sender] >= MAX_PENDING_PER_WALLET) revert TooManyPending();
 
         uint256 codes = T.CRE_SILENT;
-        if (kind != T.KIND_SWAP && !isDestination[destination] && destinationCount[destination] == 0) {
-            codes |= T.NEW_DESTINATION;
-        }
+        if (!isDestination[destination] && destinationCount[destination] == 0) codes |= T.NEW_DESTINATION;
         if (hub.isBlocked(destination)) codes |= T.BLOCKLISTED_DEST;
         if (pendingWalletAdds > 0) codes |= T.CONFIG_CHANGE_PENDING;
         if (block.timestamp < walletAddedAt[msg.sender] + 7 days) codes |= T.NEW_WALLET;
         if (amount > hardCap) codes |= T.OVER_HARD_CAP;
 
-        // No bond when it fits the Instant budget now: small requests stay free; the pending cap still applies.
-        uint256 bond = amount <= availableBudget() ? 0 : BOND;
-        uint256 escrow = kind == T.KIND_SWAP ? bond : amount + bond;
-        if (escrow != 0) ProtectedToken(token).burn(msg.sender, escrow); // escrow by burning
+        ProtectedToken(token).burn(msg.sender, amount + BOND); // escrow by burning
         id = ++nextRequestId;
-        bondOf[id] = bond;
         bytes32 h = T.hashRequest(address(this), id, kind, amount, destination);
         Request storage r = _requests[id];
         r.destination = destination;
@@ -212,7 +199,6 @@ contract Vault is VaultBase {
     /// Anyone can execute once a request is executable.
     function execute(uint256 id) external outflowsOpen {
         Request storage r = _requests[id];
-        if (r.kind == T.KIND_SWAP) revert BadKind(); // consumed by the swap itself (chargeOutflow)
         if (!isExecutable(id)) revert NotExecutable();
         if (hub.isBlocked(r.destination)) revert Blocklisted(r.destination);
         r.state = T.REQ_EXECUTED;
@@ -221,7 +207,7 @@ contract Vault is VaultBase {
         _record(r.requester, r.destination, r.amount);
         hub.emitRequestUpdated(id, T.REQ_EXECUTED, r.executableAt, r.score, r.reasonCodes);
         hub.emitOutflow(r.requester, r.destination, r.amount, false);
-        if (bondOf[id] != 0) ProtectedToken(token).mint(_returnTo(r.requester), bondOf[id]);
+        ProtectedToken(token).mint(_returnTo(r.requester), BOND);
         if (r.kind == T.KIND_PAYMENT) _payVault(r.destination, r.amount);
         else IERC20(usdc).safeTransfer(r.destination, r.amount);
     }
@@ -234,8 +220,6 @@ contract Vault is VaultBase {
     }
 
     /// Sentinel delay (Hub-only). Clamped to [Floor, MaxDelay]; above the Hard cap at least CapDelay.
-    /// Below the Floor only when the request fits the Instant budget, which it then spends: a zero-surprise
-    /// small request clears at once, and a compromised CRE can release no more than the budget (as before).
     /// A majority Fast-track beats the Sentinel.
     function applyDelay(uint256 id, bytes32 requestHash, uint64 delay, uint32 score, uint256 reasonCodes)
         external
@@ -247,11 +231,7 @@ contract Vault is VaultBase {
         if (r.requestHash != requestHash) return T.REJECT_HASH_MISMATCH;
         if (r.state != T.REQ_PENDING) return T.REJECT_TERMINAL;
         if (r.fastTracked) return T.REJECT_FAST_TRACKED;
-        if (delay < floorDelay) {
-            (uint256 u24, uint256 u7) = _usage();
-            if (r.amount <= hardCap && r.amount <= _available(u24, u7)) _spendInstant(r.amount);
-            else delay = floorDelay;
-        }
+        if (delay < floorDelay) delay = floorDelay;
         if (delay > maxDelay) delay = maxDelay;
         if (r.amount > hardCap && delay < capDelay) delay = capDelay;
         r.scored = true;
@@ -284,8 +264,7 @@ contract Vault is VaultBase {
         _removeOpen(id);
         pendingOf[r.requester]--;
         // Funds never left the Vault: re-mint the escrow (the bond only when it isn't forfeited).
-        uint256 back = (r.kind == T.KIND_SWAP ? 0 : r.amount) + (refundBond ? bondOf[id] : 0);
-        if (back != 0) ProtectedToken(token).mint(_returnTo(r.requester), back);
+        ProtectedToken(token).mint(_returnTo(r.requester), refundBond ? r.amount + BOND : r.amount);
         hub.emitRequestUpdated(id, state, 0, r.score, r.reasonCodes);
     }
 
@@ -326,29 +305,11 @@ contract Vault is VaultBase {
 
     /// A wallet's swap into the pool is an outflow: it uses the same Instant budget as an Unwrap, so an
     /// attacker can't exit through a token of an org they onboarded themselves.
-    /// While CRE is live the swap must consume an executable KIND_SWAP request of that wallet (scored first,
-    /// like every outflow); while CRE is down it falls back to the Instant budget.
     function chargeOutflow(address wallet, uint256 amount) external onlyHook outflowsOpen {
         _checkWallet(wallet);
-        if (hub.creLive()) _consumeSwap(wallet, amount);
-        else _spendInstant(amount);
+        _spendInstant(amount);
         _record(wallet, msg.sender, amount);
         hub.emitOutflow(wallet, msg.sender, amount, true);
-    }
-
-    function _consumeSwap(address wallet, uint256 amount) internal {
-        for (uint256 i; i < _open.length; i++) {
-            uint256 id = _open[i];
-            Request storage r = _requests[id];
-            if (r.kind != T.KIND_SWAP || r.requester != wallet || r.amount < amount || !isExecutable(id)) continue;
-            r.state = T.REQ_EXECUTED;
-            _removeOpen(id);
-            pendingOf[wallet]--;
-            if (bondOf[id] != 0) ProtectedToken(token).mint(wallet, bondOf[id]);
-            hub.emitRequestUpdated(id, T.REQ_EXECUTED, r.executableAt, r.score, r.reasonCodes);
-            return;
-        }
-        revert UseRequest();
     }
 
     /// Settlement, issuer side: the hook has just moved `amount` of this Vault's tokens out of the pool to this

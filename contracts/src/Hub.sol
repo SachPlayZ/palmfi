@@ -90,8 +90,6 @@ contract Hub is IReceiver {
     mapping(bytes32 => bool) public usedReports;
     address[] internal _vaults;
     uint256 public lastHeartbeat;
-    /// A heartbeat older than this means CRE is down: Vaults reopen the direct instant lane as a fallback.
-    uint256 public constant HEARTBEAT_STALE = 10 minutes;
 
     constructor(address admin_, address forwarder_) {
         admin = admin_;
@@ -157,12 +155,6 @@ contract Hub is IReceiver {
 
     function isVault(address vault) public view returns (bool) {
         return statusOf[vault] != T.STATUS_NONE;
-    }
-
-    /// CRE is live while its Reconciler heartbeat is fresh. Live: every outflow is a scored request (small ones
-    /// clear at zero delay). Silent: the direct instant lane reopens, bounded by the Instant budget as before.
-    function creLive() external view returns (bool) {
-        return lastHeartbeat != 0 && block.timestamp <= lastHeartbeat + HEARTBEAT_STALE;
     }
 
     function isBlocked(address account) external view returns (bool) {
