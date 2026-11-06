@@ -12,17 +12,17 @@ import { REQ } from "@/lib/palm";
 import { Mark, useRevealAll } from "./brand";
 import { Notice } from "./ui";
 
-const LINKS = [
+const BASE_LINKS: { href: string; label: string; inbox?: boolean; match?: string[] }[] = [
+  { href: "/vaults", label: "Dashboard", match: ["/vaults", "/vault/"] },
   { href: "/inbox", label: "Inbox", inbox: true },
-  { href: "/vaults", label: "Vaults", match: ["/vaults", "/vault/"] },
-  { href: "/pay", label: "Pay" },
   { href: "/directory", label: "Directory", match: ["/directory", "/o/"] },
-  { href: "/pool", label: "Pool" },
-  { href: "/status", label: "Status" },
 ];
 
 const MORE = [
   { href: "/onboard", label: "Create a vault" },
+  { href: "/pay", label: "Pay by name" },
+  { href: "/pool", label: "Orbital pool" },
+  { href: "/status", label: "Network status" },
   { href: "/request/new", label: "Request a payment" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/faq", label: "FAQ" },
@@ -50,6 +50,10 @@ export function Shell({ children, wide }: { children: ReactNode; wide?: boolean 
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const count = useInboxCount();
+  const { address } = useAccount();
+  const my = useMyVaults(address);
+  const home = my.mine.length === 1 ? `/vault/${my.mine[0].name ?? my.mine[0].vault}` : "/vaults";
+  const LINKS = BASE_LINKS.map((l) => (l.label === "Dashboard" ? { ...l, href: home } : l));
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [main, setMain] = useState<HTMLElement | null>(null);

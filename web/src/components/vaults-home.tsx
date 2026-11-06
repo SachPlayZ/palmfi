@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useMyVaults } from "@/lib/hub";
 import { STATUS_LABEL } from "@/lib/palm";
@@ -14,12 +14,17 @@ export function VaultsHome() {
   const { address } = useAccount();
   const my = useMyVaults(address);
   const [q, setQ] = useState("");
+  // One vault: the dashboard is home, skip the picker.
+  useEffect(() => {
+    const only = my.mine.length === 1 ? my.mine[0] : undefined;
+    if (only) router.replace(`/vault/${only.name ?? only.vault}`);
+  }, [my.mine, router]);
   return (
     <>
       <PageHead
         index="(Vaults)"
-        title="Your vaults,"
-        em="behind brakes."
+        title="Your"
+        em="vaults."
         lede="Every vault your wallet votes in. Open one by name or address, or create one for your team in a single transaction."
         actions={
           <Link className="pf-btn dark" href="/onboard">

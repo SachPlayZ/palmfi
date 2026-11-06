@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { erc20Abi, isAddress, type Address, type Hex } from "viem";
+import { useMemo, useRef } from "react";
+import { BaseError, ContractFunctionRevertedError, ContractFunctionZeroDataError, erc20Abi, isAddress, type Address, type Hex } from "viem";
 import { useReadContract, useReadContracts } from "wagmi";
 import { hubAbi, orbitalHookAbi, vaultAbi } from "@/abi";
 import type { ScoringContext } from "./deviation";
@@ -102,13 +102,23 @@ export function useVault(vault: Address | undefined) {
     query: { enabled: enabled && !!deployments.hub, refetchInterval: REFRESH },
   });
 
-  const s = useMemo(() => {
+  // A refresh where the RPC drops a read (the public Arc endpoint rate-limits bursts) must not
+  // blank the dashboard: keep the last complete read for this vault until a new one lands.
+  const last = useRef<{ vault?: Address; s?: Scalars }>({});
+  const fresh = useMemo(() => {
     if (!base.data) return undefined;
     const out: Record<string, unknown> = {};
     SCALARS.forEach((k, i) => (out[k] = base.data[i]?.result));
-    if (out.token === undefined) return undefined; // not a Vault
+    if (SCALARS.some((k) => out[k] === undefined)) return undefined;
     return out as Scalars;
   }, [base.data]);
+  if (fresh) last.current = { vault, s: fresh };
+  const s = fresh ?? (last.current.vault === vault ? last.current.s : undefined);
+  // "Not a Vault" only when the address itself rejects the call, never on a transport error.
+  const tokenErr = base.data?.[0]?.error;
+  const rejected =
+    tokenErr instanceof BaseError &&
+    !!tokenErr.walk((e) => e instanceof ContractFunctionZeroDataError || e instanceof ContractFunctionRevertedError);
   const tail = base.data?.slice(SCALARS.length);
   const status = tail?.[0]?.result as number | undefined;
   const lastHeartbeat = tail?.[1]?.result as bigint | undefined;
@@ -199,7 +209,7 @@ export function useVault(vault: Address | undefined) {
     requests,
     changes,
     isLoading: base.isLoading,
-    notVault: base.isSuccess && !s,
+    notVault: base.isSuccess && !s && rejected,
     refetch: () => {
       base.refetch();
       balQ.refetch();

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useAccount } from "wagmi";
+import { useMyVaults } from "@/lib/hub";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 /* ───────────────────────── helpers ───────────────────────── */
@@ -1065,13 +1067,24 @@ function Footer() {
 
 /* ───────────────────────── page ───────────────────────── */
 
+/** Top-right CTA: straight to the dashboard when the connected wallet already has a vault. */
+function TopCta() {
+  const { address } = useAccount();
+  const my = useMyVaults(address);
+  const only = my.mine[0];
+  const href = my.mine.length === 1 ? `/vault/${only.name ?? only.vault}` : my.mine.length > 1 ? "/vaults" : "/onboard";
+  return (
+    <Link href={href} className="m-pill m-cta-fixed">
+      {my.mine.length ? "Open dashboard" : "Open a vault"}
+    </Link>
+  );
+}
+
 export function Meadow() {
   useReveals();
   return (
     <div className="meadow">
-      <Link href="/onboard" className="m-pill m-cta-fixed">
-        Open a vault
-      </Link>
+      <TopCta />
       <main>
         <Hero />
         <Statement />

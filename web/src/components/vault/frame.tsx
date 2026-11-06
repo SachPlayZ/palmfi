@@ -80,7 +80,8 @@ export function VaultFrame({ id, children }: { id: string; children: ReactNode }
   const tabs: { href: string; label: string; n?: number; red?: boolean }[] = [
     { href: "", label: "Overview" },
     { href: "/requests", label: "Requests", n: open },
-    { href: "/send", label: "Send & pay" },
+    { href: "/send", label: "Send" },
+    { href: "/receive", label: "Receive" },
     { href: "/wallets", label: "Wallets" },
     { href: "/settings", label: "Settings", n: changes },
     { href: "/activity", label: "Activity" },
