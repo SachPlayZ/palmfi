@@ -214,16 +214,25 @@ contract OrbitalTest is NetworkTest {
         assertGe(usdcBalance(address(v)), tokenOf(v).totalSupply(), "reserves >= supply");
     }
 
-    // --- Ticks: depeg bound protecting the issuer's own LP ---
+    // --- Orbital ticks (nested caps, torus consolidation) ---
 
-    function test_tick_boundsForeignInventory() public {
-        vm.prank(w[0]);
-        hook.setTick(nt, 9_500); // Nvidia: won't accept a token worth < 95% of its own
-        // Dump palantir into nvidia until the tick breaches; accepted input is bounded.
-        uint256 lo;
-        uint256 hi = 9_000e6;
-        vm.expectRevert(abi.encodeWithSelector(OrbitalHook.TickBreached.selector, pt, nt));
-        hook.quote(pt, nt, hi, true);
+    /// Move all three orgs' 10k liquidity from the full sphere into one tick.
+    function _allInTick(uint256 tick) internal {
+        Vault[3] memory vs = [nvidia, palantir, evil];
+        address[3] memory ws = [w[0], p[0], e[0]];
+        for (uint256 i; i < 3; i++) {
+            address t = vs[i].token();
+            vm.startPrank(ws[i]);
+            hook.removeLiquidity(t, 10_000e6, ws[i]);
+            tokenOf(vs[i]).approve(address(hook), 10_000e6);
+            hook.addLiquidity(t, 10_000e6, tick);
+            vm.stopPrank();
+        }
+    }
+
+    /// Largest exact-in dump of palantir into nvidia the pool still accepts.
+    function _maxDump() internal view returns (uint256 lo) {
+        uint256 hi = 9_900e6;
         while (hi - lo > 1e6) {
             uint256 mid = (lo + hi) / 2;
             try hook.quote(pt, nt, mid, true) {
@@ -232,58 +241,100 @@ contract OrbitalTest is NetworkTest {
                 hi = mid;
             }
         }
-        // Without the tick the same pool would take (almost) all of nvidia's reserve for palantir; with it the
-        // foreign inventory is capped well below nvidia's 10k LP.
-        assertLt(lo, 7_200e6); // measured ≈7.09k at a 95% floor (20× concentration)
-        assertGt(lo, 0);
-        // A tighter tick bounds exposure harder.
-        vm.prank(w[0]);
-        hook.setTick(nt, 9_900);
-        vm.expectRevert(abi.encodeWithSelector(OrbitalHook.TickBreached.selector, pt, nt));
-        hook.quote(pt, nt, lo, true);
-        // Other direction (nvidia into palantir) is unaffected by nvidia's tick.
-        hook.quote(nt, pt, 1_000e6, true);
     }
 
-    function test_tick_onlyOwnWalletAndRange() public {
+    function test_ticks_insideItsRange_samePriceAsSphere() public {
+        (uint256 inWide, uint256 outWide) = hook.quote(pt, nt, 100e6, true);
+        uint256 snap = vm.snapshotState();
+        _allInTick(7);
+        assertTrue(hook.ticksOn());
+        (uint256 inTick, uint256 outTick) = hook.quote(pt, nt, 100e6, true);
+        vm.revertToState(snap);
+        assertEq(inWide, inTick);
+        assertApproxEqRel(outWide, outTick, 1e12); // 1e-6: same curve until a cap is reached
+    }
+
+    function test_ticks_boundaryBoundsForeignInventory() public {
+        uint256 wide = _maxDump();
+        _allInTick(5); // 95% depeg floor
+        uint256 tight = _maxDump();
+        // At the cap every tick is pinned on its circle: the pool stops accepting the depegging token.
+        assertLt(tight, wide);
+        assertGt(tight, 0);
+        vm.expectRevert(); // TickExhausted / OffTorus: beyond the cap nothing trades toward the dumped token
+        hook.quote(pt, nt, tight + 2_000e6, true);
+        vm.expectRevert();
+        hook.quote(pt, nt, 9_000e6, false);
+    }
+
+    function test_ticks_mixedTicks_crossBoundaryContinuously() public {
+        // Tick 1 and the full sphere together: the tight tick hits its cap first, the wide one carries on.
+        Vault[3] memory vs = [nvidia, palantir, evil];
+        address[3] memory ws = [w[0], p[0], e[0]];
+        for (uint256 i; i < 3; i++) {
+            depositUsdc(vs[i], ws[i], 5_000e6);
+            vm.startPrank(ws[i]);
+            tokenOf(vs[i]).approve(address(hook), 5_000e6);
+            hook.addLiquidity(vs[i].token(), 5_000e6, 1);
+            vm.stopPrank();
+        }
+        assertTrue(hook.ticksOn());
+        uint256 prevOut;
+        for (uint256 d = 100e6; d <= 4_000e6; d += 100e6) {
+            (, uint256 out) = hook.quote(pt, nt, d, true);
+            assertGt(out, prevOut); // monotone through the crossing (no jump, no dip)
+            assertLe(out, d + d / 10); // price stays sane
+            prevOut = out;
+        }
+    }
+
+    function test_ticks_swapEndToEnd_andRoundtripNeverProfits() public {
+        _allInTick(7);
+        uint256 before_ = tokenOf(palantir).balanceOf(p[0]);
         vm.prank(p[0]);
-        vm.expectRevert(OrbitalHook.NotWallet.selector);
-        hook.setTick(nt, 9_000);
-        vm.startPrank(w[0]);
-        vm.expectRevert(OrbitalHook.BadTick.selector);
-        hook.setTick(nt, 100);
-        vm.expectRevert(OrbitalHook.BadTick.selector);
-        hook.setTick(nt, 10_000);
-        hook.setTick(nt, 9_000);
-        hook.setTick(nt, 0); // loosening is the issuer's own choice
-        vm.stopPrank();
+        (, uint256 out) = router.swap(pt, nt, 300e6, true, 0, w[0]);
+        assertGt(out, 290e6);
+        _assertBacked(nvidia);
+        // swap the proceeds back: never end with more than we started
+        vm.prank(w[0]);
+        tokenOf(nvidia).approve(address(router), type(uint256).max);
+        address back = p[0];
+        vm.prank(w[0]);
+        (, uint256 out2) = router.swap(nt, pt, out, true, 0, back);
+        assertLe(out2, 300e6 + 3); // up to base-unit rounding
+        assertLe(tokenOf(palantir).balanceOf(p[0]), before_);
     }
 
-    function test_tick_swapWithinBoundStillWorks_frozenIssuerCappedExposure() public {
+    function test_ticks_lpExitFromItsOwnTick() public {
+        _allInTick(4);
+        assertEq(hook.tickLiquidity(nt, 4), 10_000e6);
         vm.prank(w[0]);
-        hook.setTick(nt, 9_500);
-        uint256 paid = _pay(p[0], palantir, nvidia, nvidia.wallets()[1], 100e6);
-        assertGt(paid, 0);
-        // Palantir gets frozen: its token stops trading; nvidia's inventory of pUSDC stays at what was swapped in.
-        uint256 held = hook.reserveOf(pt) - hook.liquidityOf(pt);
+        vm.expectRevert(OrbitalHook.InsufficientLiquidity.selector); // nothing left in the full sphere
+        hook.removeLiquidity(nt, 1e6, w[0]);
+        vm.prank(w[0]);
+        hook.removeLiquidity(nt, 1_000e6, w[0], 4);
+        assertEq(hook.tickLiquidity(nt, 4), 9_000e6);
+        vm.prank(w[0]);
+        vm.expectRevert(OrbitalHook.BadTick.selector);
+        hook.addLiquidity(nt, 1e6, 11);
+    }
+
+    /// Brief demo: a depegging (frozen) Palantir can only have pushed so much of its token into Nvidia's tight-tick
+    /// pool, whatever it tries: the cap, not the LP, bounds the exposure.
+    function test_ticks_frozenPalantir_exposureWithinTickBound() public {
+        _allInTick(5); // 95% depeg floor
+        uint256 bound = _maxDump();
+        vm.prank(p[0]);
+        (uint256 inAmt,) = router.swap(pt, nt, 150e6, true, 0, w[0]);
         vm.prank(p[1]);
         palantir.freeze();
+        uint256 inventory = hook.reserveOf(pt) - hook.liquidityOf(pt);
+        assertEq(inventory, inAmt);
+        assertLe(inventory, bound);
+        // frozen: nothing more goes in, and nothing can settle out of Palantir
         vm.expectRevert(abi.encodeWithSelector(OrbitalHook.FrozenToken.selector, pt));
         hook.quote(pt, nt, 1e6, true);
-        assertEq(hook.reserveOf(pt) - hook.liquidityOf(pt), held);
-        assertLe(held, 7_200e6); // bounded by the tick
-    }
-
-    function testFuzz_tick_priceNeverBelowFloor(uint96 amt, uint16 floorBps) public {
-        uint256 floor = bound(floorBps, 5_000, 9_999);
-        vm.prank(w[0]);
-        hook.setTick(nt, floor);
-        uint256 a = bound(amt, 1e6, 9_500e6);
-        try hook.quote(pt, nt, a, true) returns (uint256 inn, uint256 out) {
-            uint256 r = hook.radius();
-            uint256 ai = r - (hook.reserveOf(pt) + hook.virtualOffset()) - inn;
-            uint256 aj = r - (hook.reserveOf(nt) + hook.virtualOffset()) + out;
-            assertGe(ai * 10_000, aj * floor);
-        } catch {}
+        assertEq(hook.settle(), 0);
+        assertEq(hook.reserveOf(pt) - hook.liquidityOf(pt), inventory);
     }
 }

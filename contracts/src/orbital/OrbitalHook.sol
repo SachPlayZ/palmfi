@@ -12,6 +12,7 @@ import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/Pool
 import {IMsgSender} from "@uniswap/v4-periphery/src/interfaces/IMsgSender.sol";
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {OrbitalMath} from "./OrbitalMath.sol";
+import {OrbitalTicks} from "./OrbitalTicks.sol";
 
 /// The Vault as the Orbital pool sees it (ADR-0010).
 interface IOrbitalVault {
@@ -44,8 +45,13 @@ interface IERC20Min {
 /// here and sends their USDC to the under-supplied Vault, which mints its own token back in. A Frozen issuer
 /// halts its settlement.
 contract OrbitalHook is BaseHook, IUnlockCallback {
-    /// Liquidity concentration around the peg (virtual reserves = C × real at balance).
+    
+    /// Liquidity concentration around the peg (virtual reserves = C × real at balance): keeps unevenly funded
+    /// pools on the curve. Ticks are measured on the virtual reserves, as price bands.
     uint256 public constant CONCENTRATION = 20;
+    /// The tick an LP lands in by default: the full sphere (no cap).
+    uint256 public constant DEFAULT_TICK = 10;
+    uint256 public virtualOffset;
     uint256 public constant MAX_TOKENS = 32;
     uint160 internal constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
 
@@ -62,14 +68,15 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     mapping(address => uint256) public liquidityOf;
 
     /// Sphere state, recomputed on every liquidity or settlement event.
-    uint256 public virtualOffset;
+    uint256 internal constant TICKS = 10;
+    /// True while the fitted scale uses tight ticks (otherwise the plain sphere).
+    bool public ticksOn;
     uint256 public radius;
 
-    /// Tick (depeg bound), set by each token's issuer for its own LP: the lowest price, in bps of the peg, at which
-    /// the pool will still accept another token in exchange for this one. 0 = no bound. A dumped (depegging) token
-    /// can therefore only accumulate until its marginal price hits the bound, which caps the issuer LP's exposure.
-    mapping(address => uint256) public tickFloorBps;
-    uint256 internal constant BPS = 10_000;
+    /// Orbital ticks: liquidity per tick (1 = tightest cap near the peg … 10 = the full sphere), pool-wide and per
+    /// token, so a Vault withdraws from the tick it deposited in. All weight in tick 10 is the plain sphere.
+    uint256[10] internal _tickWeight;
+    mapping(address => uint256[10]) internal _tokenTickLiq;
 
     bool transient _initializing;
 
@@ -77,7 +84,6 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     event LiquidityAdded(address indexed token, address indexed wallet, uint256 amount);
     event LiquidityRemoved(address indexed token, address indexed wallet, uint256 amount);
     event OrbitalSwap(address indexed tokenIn, address indexed tokenOut, address payer, uint256 amountIn, uint256 amountOut);
-    event TickSet(address indexed token, uint256 floorBps);
     event Settled(address indexed fromToken, address indexed toToken, uint256 amount);
 
     error OnlyFactory();
@@ -92,8 +98,8 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     error TooManyTokens();
     error PoolNotAllowed();
     error LiquidityNotAllowed();
-    error TickBreached(address tokenIn, address tokenOut);
     error BadTick();
+    error TickExhausted();
 
     constructor(IPoolManager pm, address factory_, address admin_) BaseHook(pm) {
         factory = factory_;
@@ -167,43 +173,62 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     uint8 internal constant REMOVE = 1;
     uint8 internal constant SETTLE = 2;
 
-    /// An org adds its own token from one of its wallets (value stays its own: no outflow).
+    /// An org adds its own token from one of its wallets (value stays its own: no outflow), in the default tick.
     function addLiquidity(address token, uint256 amount) external {
+        _add(token, amount, DEFAULT_TICK);
+    }
+
+    /// Same, choosing a tick: 1 is the tightest cap around the peg (deepest, but the pool stops trading toward it
+    /// sooner once the price runs away), 10 the full sphere.
+    function addLiquidity(address token, uint256 amount, uint256 tick) external {
+        _add(token, amount, tick);
+    }
+
+    function _add(address token, uint256 amount, uint256 tick) internal {
+        if (tick == 0 || tick > TICKS) revert BadTick();
         address v = _vault(token);
         if (!IOrbitalVault(v).isWallet(msg.sender)) revert NotWallet();
         poolManager.unlock(abi.encode(ADD, token, amount, msg.sender));
         reserveOf[token] += amount;
         liquidityOf[token] += amount;
-        _resize();
+        _tokenTickLiq[token][tick - 1] += amount;
+        _tickWeight[tick - 1] += amount;
+        _resize(true);
         emit LiquidityAdded(token, msg.sender, amount);
     }
 
-    /// Withdraw own-token liquidity to one of the org's wallets. Settles first, so an LP only ever gets its
-    /// own token back; if the pool still lacks it (issuers frozen), the rest waits.
+    /// Withdraw own-token liquidity (default tick) to one of the org's wallets. Settles first, so an LP only
+    /// ever gets its own token back; if the pool still lacks it (issuers frozen), the rest waits.
     function removeLiquidity(address token, uint256 amount, address to) external {
+        _remove(token, amount, to, DEFAULT_TICK);
+    }
+
+    function removeLiquidity(address token, uint256 amount, address to, uint256 tick) external {
+        _remove(token, amount, to, tick);
+    }
+
+    function _remove(address token, uint256 amount, address to, uint256 tick) internal {
+        if (tick == 0 || tick > TICKS) revert BadTick();
         address v = _vault(token);
         if (!IOrbitalVault(v).isWallet(msg.sender) || !IOrbitalVault(v).isWallet(to)) revert NotWallet();
-        if (amount > liquidityOf[token]) revert InsufficientLiquidity();
+        if (amount > _tokenTickLiq[token][tick - 1]) revert InsufficientLiquidity();
         poolManager.unlock(abi.encode(REMOVE, token, amount, to));
         liquidityOf[token] -= amount;
-        _resize();
+        _tokenTickLiq[token][tick - 1] -= amount;
+        _tickWeight[tick - 1] -= amount;
+        _resize(false);
         emit LiquidityRemoved(token, msg.sender, amount);
     }
 
-    /// An org sets the depeg bound protecting its own LP: the pool refuses trades that would push the marginal
-    /// price of an incoming token below `floorBps`/10000 of this token. Must be 0 or in [5000, 10000).
-    function setTick(address token, uint256 floorBps) external {
-        if (!IOrbitalVault(_vault(token)).isWallet(msg.sender)) revert NotWallet();
-        if (floorBps != 0 && (floorBps < 5000 || floorBps >= BPS)) revert BadTick();
-        tickFloorBps[token] = floorBps;
-        emit TickSet(token, floorBps);
+    function tickLiquidity(address token, uint256 tick) external view returns (uint256) {
+        return _tokenTickLiq[token][tick - 1];
     }
 
     /// Deferred burn-and-mint: move every token's excess (held beyond what its issuer provided) to the tokens
     /// that are short, issuer Vault → receiving Vault in USDC. Anyone may call (the Reconciler does each pass).
     function settle() external returns (uint256 moved) {
         moved = abi.decode(poolManager.unlock(abi.encode(SETTLE, address(0), 0, address(0))), (uint256));
-        if (moved > 0) _resize();
+        if (moved > 0) _resize(false);
     }
 
     function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory) {
@@ -270,17 +295,18 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         if (IOrbitalVault(vaultOf[tokenOut]).isFrozen()) revert FrozenToken(tokenOut);
         // Only tokens with liquidity sit on the sphere (an unfunded token would trade at a fake price).
         if (liquidityOf[tokenIn] == 0 || liquidityOf[tokenOut] == 0 || radius == 0) revert InsufficientLiquidity();
-        uint256 ai = radius - (reserveOf[tokenIn] + virtualOffset);
-        uint256 aj = radius - (reserveOf[tokenOut] + virtualOffset);
-        if (exactIn) (amountIn, amountOut) = (amount, OrbitalMath.outGivenIn(ai, aj, amount));
-        else (amountIn, amountOut) = (OrbitalMath.inGivenOut(ai, aj, amount), amount);
-        if (amountOut > reserveOf[tokenOut]) revert InsufficientReserve();
-        // Tick: after the trade, the incoming token must still be worth at least the out-token's floor.
-        uint256 floorBps = tickFloorBps[tokenOut];
-        if (floorBps != 0) {
-            // marginal price of tokenIn in tokenOut after the trade = (ai − in) / (aj + out)
-            if ((ai - amountIn) * BPS < (aj + amountOut) * floorBps) revert TickBreached(tokenIn, tokenOut);
+        if (ticksOn) {
+            (OrbitalTicks.Ticks memory t, OrbitalTicks.Pool memory pool) = _tickPool(tokenIn, tokenOut);
+            if (exactIn) (amountIn, amountOut) = (amount, OrbitalTicks.outGivenIn(t, pool, amount, reserveOf[tokenOut]));
+            else (amountIn, amountOut) = (OrbitalTicks.inGivenOut(t, pool, amount), amount);
+            if (amountIn == 0 || amountOut == 0) revert TickExhausted(); // every tick at its boundary: no more in this direction
+        } else {
+            uint256 ai = radius - (reserveOf[tokenIn] + virtualOffset);
+            uint256 aj = radius - (reserveOf[tokenOut] + virtualOffset);
+            if (exactIn) (amountIn, amountOut) = (amount, OrbitalMath.outGivenIn(ai, aj, amount));
+            else (amountIn, amountOut) = (OrbitalMath.inGivenOut(ai, aj, amount), amount);
         }
+        if (amountOut > reserveOf[tokenOut]) revert InsufficientReserve();
     }
 
     function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata)
@@ -323,28 +349,75 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         v = vaultOf[token];
     }
 
-    /// Re-fit the sphere to the funded tokens' reserves: V = (C−1)·L/N, r through X = x + V. Registered tokens
-    /// without liquidity stay off the sphere, so spam registrations can't push it off-curve.
-    function _resize() internal {
+    /// Sums over the funded tokens' virtual reserves X = x + V.
+    function _stats() internal view returns (uint256 n, uint256 sx, uint256 sx2) {
+        for (uint256 i; i < tokens.length; i++) {
+            if (liquidityOf[tokens[i]] == 0) continue;
+            uint256 x = reserveOf[tokens[i]] + virtualOffset;
+            n++;
+            sx += x;
+            sx2 += x * x;
+        }
+    }
+
+    function _tickPool(address tokenIn, address tokenOut)
+        internal
+        view
+        returns (OrbitalTicks.Ticks memory t, OrbitalTicks.Pool memory pool)
+    {
         uint256 n;
-        uint256 total;
+        (n, pool.sumX, pool.sumX2) = _stats();
+        t = OrbitalTicks.build(n, _tickWeight);
+        pool.c = radius;
+        pool.xi = reserveOf[tokenIn] + virtualOffset;
+        pool.xj = reserveOf[tokenOut] + virtualOffset;
+    }
+
+    function _hasTightTicks() internal view returns (bool) {
+        for (uint256 b; b < TICKS - 1; b++) {
+            if (_tickWeight[b] != 0) return true;
+        }
+        return false;
+    }
+
+    /// Re-fit the curve to the funded tokens' reserves: V = (C−1)·L/N, then the plain sphere, or the tick torus when
+    /// any tight tick holds liquidity. Registered tokens without liquidity stay off the curve, so spam
+    /// registrations can't push it off-curve. `strict`: a liquidity add whose ticks cannot be fitted reverts;
+    /// exits and settlements instead fall back to the plain sphere, so funds never wait on the tick fit.
+    function _resize(bool strict) internal {
+        (uint256 n, uint256 total) = (0, 0);
         for (uint256 i; i < tokens.length; i++) {
             if (liquidityOf[tokens[i]] == 0) continue;
             n++;
             total += reserveOf[tokens[i]];
         }
+        ticksOn = false;
         if (n < 2 || total == 0) {
             (virtualOffset, radius) = (0, 0);
             return;
         }
-        uint256 v = (CONCENTRATION - 1) * total / n;
+        virtualOffset = (CONCENTRATION - 1) * total / n;
+        if (_hasTightTicks()) {
+            (, uint256 sx, uint256 sx2) = _stats();
+            OrbitalTicks.Ticks memory t = OrbitalTicks.build(n, _tickWeight);
+            try this.fitTicks(t, sx, sx2) returns (uint256 c) {
+                (radius, ticksOn) = (c, true);
+                return;
+            } catch {
+                if (strict) revert BadTick();
+            }
+        }
         uint256[] memory X = new uint256[](n);
         uint256 k;
         for (uint256 i; i < tokens.length; i++) {
             if (liquidityOf[tokens[i]] == 0) continue;
-            X[k++] = reserveOf[tokens[i]] + v;
+            X[k++] = reserveOf[tokens[i]] + virtualOffset;
         }
-        virtualOffset = v;
         radius = OrbitalMath.radius(X);
+    }
+
+    /// External only so `_resize` can catch a failed fit.
+    function fitTicks(OrbitalTicks.Ticks memory t, uint256 sx, uint256 sx2) external view returns (uint256) {
+        return OrbitalTicks.fit(t, sx, sx2);
     }
 }

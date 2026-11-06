@@ -22,6 +22,7 @@ library PalmTypes {
     // --- Queued request kinds ---
     uint8 internal constant KIND_UNWRAP = 0; // USDC to an outside destination
     uint8 internal constant KIND_PAYMENT = 1; // USDC backing to another palmfi Vault (destination = payee Vault)
+    uint8 internal constant KIND_SWAP = 2; // pre-cleared Orbital pool swap-in (destination = hook); consumed by the swap
 
     // --- CRE report types ---
     uint8 internal constant REPORT_SET_DELAY = 0;
