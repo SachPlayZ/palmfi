@@ -1,0 +1,28 @@
+$ cre workflow simulate sentinel --target staging-settings --non-interactive --trigger-index 0 --limits default --evm-tx-hash 0x3719ddb39ef6e198469130bde08d2c044045a16e9e80d5fdfc135462fbe17720 --evm-event-index 1
+
+✓ Workflow compiled
+✓ Simulation limits enabled
+  HTTP: req=120kb resp=250kb timeout=10s | ConfHTTP: req=125kb resp=500kb timeout=1m30s | Consensus obs=25kb | ChainWrite evm_report=50kb evm_gas=10000000 solana_report=265b solana_cu=300000 | WASM binary=100mb compressed=20mb
+  Binary hash: 2270299dfef809c09a83d1c1aa6b3e4564f3d608e73f30b49f4685319320aa31
+  Config hash: f3a013c5a05f5376896105ccb1a08bb4b580642970ff0ce8e1f276d4446c648f
+2026-11-06T18:26:02Z [SIMULATION] Simulator Initialized
+
+2026-11-06T18:26:02Z [SIMULATION] Running trigger trigger=evm:ChainSelector:3034092155422581607@1.0.0
+
+✓ Workflow Simulation Result:
+"RequestQueued: 0x135a023F0109c8b27A35BE8B6DC25e386A85E375#1 DELAY SKIP_SCORED score=9000 delay=10919 [CONFIG_CHANGE_PENDING,NEW_WALLET]"
+
+2026-11-06T18:26:03Z [SIMULATION] Execution finished signal received
+2026-11-06T18:26:03Z [SIMULATION] Skipping WorkflowEngineV2
+
+╭──────────────────────────────────────────────────────╮
+│ Simulation complete! Ready to deploy your workflow?  │
+│                                                      │
+│ Run cre account access to request deployment access. │
+╰──────────────────────────────────────────────────────╯
+
+Initializing...
+Loading settings...
+Checking RPC connectivity...
+Compiling workflow...
+Fetching transaction receipt for 0x3719ddb39ef6e198469130bde08d2c044045a16e9e80d5fdfc135462fbe17720...

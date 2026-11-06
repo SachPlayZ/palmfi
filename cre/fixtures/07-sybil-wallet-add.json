@@ -6,5 +6,7 @@
   "setup": "A wallet proposes ADD_WALLET (ConfigChange, eta=0): every open request is re-scored with CONFIG_CHANGE_PENDING.",
   "expect": "CONFIG_CHANGE_PENDING",
   "unitTest": "sentinel/failure-matrix.test.ts row 7",
-  "enabled": false
+  "enabled": true,
+  "evmTxHash": "0xb07e0056491ec56b03c80c66aa568c7357eb54545518d18384cc46a30e4b0ced",
+  "evmEventIndex": 0
 }
