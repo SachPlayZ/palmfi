@@ -9,8 +9,6 @@
  *
  * Only for a local Anvil node: it uses Anvil's well-known dev keys and impersonation.
  */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { EVMLog } from "@chainlink/cre-sdk";
 import { ConfidentialHttpMock, EvmMock, newTestRuntime, test as creTest } from "@chainlink/cre-sdk/test";
 import { describe } from "bun:test";
@@ -40,13 +38,17 @@ import * as P from "../shared/palm";
 
 const RPC = process.env.E2E_RPC ?? "http://127.0.0.1:8545";
 const ENABLED = !!process.env.E2E_DEPLOYMENT;
-const dep = ENABLED ? JSON.parse(readFileSync(process.env.E2E_DEPLOYMENT!, "utf8")) : {};
-const arc = JSON.parse(readFileSync(join(import.meta.dir, "../../config/arc.json"), "utf8"));
+const dep = ENABLED ? JSON.parse(await Bun.file(process.env.E2E_DEPLOYMENT!).text()) : {};
+const arc = JSON.parse(await Bun.file(`${import.meta.dir}/../../config/arc.json`).text());
 const USDC = arc.tokens.usdc as Address;
 const FORWARDER = arc.cre.simForwarder as Address;
-const out = (n: string) =>
-  JSON.parse(readFileSync(join(import.meta.dir, `../../contracts/out/${n}.sol/${n}.json`), "utf8")).abi as Abi;
-const ABI = {
+const outRaw = async (n: string) =>
+  JSON.parse(await Bun.file(`${import.meta.dir}/../../contracts/out/${n}.sol/${n}.json`).text()).abi as Abi;
+const out = (n: string) => ABIS[n];
+const ABIS: Record<string, Abi> = Object.fromEntries(
+  !ENABLED ? [] : await Promise.all(["Vault", "VaultModule", "VaultFactory", "Hub", "OrbitalHook", "OrbitalRouter", "ProtectedToken"].map(async (n) => [n, await outRaw(n)])),
+);
+const ABI = !ENABLED ? ({} as never) : {
   vault: [...out("Vault"), ...out("VaultModule").filter((x: { type: string }) => x.type !== "constructor")] as Abi,
   factory: out("VaultFactory"),
   hub: out("Hub"),
@@ -102,7 +104,7 @@ function installLiveCapabilities() {
       const rcpt = JSON.parse(r.stdout.toString());
       const rejected = rcpt.logs.some((l: { topics: Hex[] }) => {
         try {
-          return decodeEventLog({ abi: ABI.hub, data: (l as { data: Hex }).data, topics: l.topics as [Hex] }).eventName === "ReportRejected";
+          return decodeEventLog({ abi: ABI.hub, data: (l as unknown as { data: Hex }).data, topics: l.topics as [Hex] }).eventName === "ReportRejected";
         } catch {
           return false;
         }
@@ -124,10 +126,10 @@ function installLiveCapabilities() {
   };
 }
 
-const sentinelCfg: SConfig = JSON.parse(readFileSync(join(import.meta.dir, "config.staging.json"), "utf8"));
+const sentinelCfg: SConfig = JSON.parse(await Bun.file(`${import.meta.dir}/config.staging.json`).text());
 sentinelCfg.hub = dep.hub;
 sentinelCfg.notify = { url: "https://notify.local/api/notify", apiKeySecret: "notifyApiKey" };
-const reconCfg: RConfig = JSON.parse(readFileSync(join(import.meta.dir, "../reconciler/config.staging.json"), "utf8"));
+const reconCfg: RConfig = JSON.parse(await Bun.file(`${import.meta.dir}/../reconciler/config.staging.json`).text());
 reconCfg.hub = dep.hub;
 reconCfg.notify = sentinelCfg.notify;
 
@@ -145,7 +147,7 @@ async function sentinel(hash: Hex): Promise<string[]> {
     }
     if (!["RequestQueued", "ConfigChange", "Outflow"].includes(name)) continue;
     installLiveCapabilities();
-    const runtime = newTestRuntime<SConfig>(new Map([["notifyApiKey", "k"]]));
+    const runtime = newTestRuntime<SConfig>(new Map([["", new Map([["notifyApiKey", "k"]])]]));
     runtime.config = sentinelCfg;
     const log = {
       address: hexToBytes(l.address),
@@ -167,7 +169,7 @@ async function sentinel(hash: Hex): Promise<string[]> {
 let slot = 0n;
 function reconciler(): string {
   installLiveCapabilities();
-  const runtime = newTestRuntime<RConfig>(new Map([["notifyApiKey", "k"]]));
+  const runtime = newTestRuntime<RConfig>(new Map([["", new Map([["notifyApiKey", "k"]])]]));
   runtime.config = reconCfg;
   return onCron(runtime, { scheduledExecutionTime: { seconds: ++slot + BigInt(Date.now()) } } as never);
 }
@@ -401,5 +403,5 @@ describe("local e2e (Anvil fork)", () => {
   if (!ENABLED) return;
   creTest("hack → FLAG → Lifeline → recovery → repayment", async () => {
     await main();
-  }, 600_000);
+  });
 });
