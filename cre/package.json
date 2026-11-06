@@ -8,6 +8,7 @@
     "test": "for p in shared sentinel reconciler; do (cd $p && bun test) || exit 1; done",
     "build": "for p in sentinel reconciler; do (cd $p && bun cre-compile main.ts dist/$p.wasm) || exit 1; done",
     "simulate": "bun scripts/simulate.ts",
-    "sync-config": "bun scripts/sync-config.ts"
+    "sync-config": "bun scripts/sync-config.ts",
+    "live": "bun scripts/live.ts"
   }
 }
