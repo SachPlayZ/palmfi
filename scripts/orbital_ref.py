@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Reference math for the single-sphere N-token Orbital invariant (Paradigm, June 2025).
+
+Invariant:  ||r*1 - x||^2 = r^2, x in R^n (reserves), every x_i <= r.
+Write a_k = r - x_k ("distance below the cap"). Then sum_k a_k^2 = r^2.
+
+A swap changes only two coords i (in) and j (out); every other a_k is fixed, so
+    a_i'^2 + a_j'^2 = a_i^2 + a_j^2            (closed form, no Newton)
+exact-in : a_i' = a_i - d_in,  a_j' = sqrt(a_i^2 + a_j^2 - a_i'^2),  d_out = a_j' - a_j
+exact-out: a_j' = a_j + d_out, a_i' = sqrt(a_i^2 + a_j^2 - a_j'^2),  d_in  = a_i - a_i'
+
+The hook does not store r: it re-derives it from reserves before each swap.
+Expanding the invariant:  (n-1) r^2 - 2 S r + Q = 0  with S = sum x, Q = sum x^2.
+Take the larger root (the one with every x_i <= r):  r = (S + sqrt(S^2 - (n-1) Q)) / (n-1).
+Equal-price point check: x_i = r (1 - 1/sqrt(n)).
+
+All values are WAD (1e18) integers, matching contracts/src/orbital/OrbitalMath.sol.
+Results here are exact (Decimal, 100 digits) then floored, so Solidity should match
+within a few wei (it floors every intermediate sqrt).
+
+Usage:
+  orbital_ref.py radius   x1,x2,...           -> r (wad, floor)
+  orbital_ref.py exact-in  x1,x2,... i j d     -> d_out (wad, floor)
+  orbital_ref.py exact-out x1,x2,... i j d     -> d_in  (wad, ceil)
+  orbital_ref.py vectors [count] [seed]        -> Solidity test-vector file on stdout (run forge fmt after)
+  orbital_ref.py selftest
+ffi mode (Foundry): add --abi to print the result as a 32-byte hex word.
+"""
+
+import random
+import sys
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, getcontext
+
+getcontext().prec = 100
+WAD = 10**18
+
+
+def D(v) -> Decimal:
+    return Decimal(int(v)) if isinstance(v, int) else Decimal(v)
+
+
+def radius_exact(xs) -> Decimal:
+    n = len(xs)
+    if n < 2:
+        raise ValueError("need >= 2 active tokens")
+    S = sum(D(x) for x in xs)
+    Q = sum(D(x) * D(x) for x in xs)
+    disc = S * S - (n - 1) * Q
+    if disc < 0:
+        raise ValueError("infeasible reserves (imbalanced)")
+    return (S + disc.sqrt()) / (n - 1)
+
+
+def exact_in_exact(xs, i, j, d) -> Decimal:
+    r = radius_exact(xs)
+    ai, aj, d = r - D(xs[i]), r - D(xs[j]), D(d)
+    if d > ai:
+        raise ValueError("exceeds cap")
+    ai2 = ai - d
+    aj2 = (ai * ai + aj * aj - ai2 * ai2).sqrt()
+    out = aj2 - aj
+    if out >= D(xs[j]):
+        raise ValueError("insufficient liquidity")
+    return out
+
+
+def exact_out_exact(xs, i, j, d) -> Decimal:
+    r = radius_exact(xs)
+    ai, aj, d = r - D(xs[i]), r - D(xs[j]), D(d)
+    if d >= D(xs[j]):
+        raise ValueError("insufficient liquidity")
+    aj2 = aj + d
+    t = ai * ai + aj * aj - aj2 * aj2
+    if t < 0:
+        raise ValueError("insufficient liquidity")
+    return ai - t.sqrt()
+
+
+def floor(v: Decimal) -> int:
+    return int(v.to_integral_value(rounding=ROUND_FLOOR))
+
+
+def ceil(v: Decimal) -> int:
+    return int(v.to_integral_value(rounding=ROUND_CEILING))
+
+
+def radius(xs) -> int:
+    return floor(radius_exact(xs))
+
+
+def exact_in(xs, i, j, d) -> int:
+    return floor(exact_in_exact(xs, i, j, d))
+
+
+def exact_out(xs, i, j, d) -> int:
+    return ceil(exact_out_exact(xs, i, j, d))
+
+
+def selftest():
+    # equal-price point: x_i = r (1 - 1/sqrt n)
+    for n in range(2, 8):
+        x = 1_000_000 * WAD
+        r = radius_exact([x] * n)
+        assert abs(D(x) - r * (1 - 1 / D(n).sqrt())) < 1, n
+    # marginal price at balance is 1:1
+    xs = [10**9 * WAD] * 4
+    d = 10**6  # 1e-12 of reserves
+    assert abs(exact_in_exact(xs, 0, 1, d) - d) < 1
+    # round trip in -> out -> in is consistent
+    xs = [5 * 10**6 * WAD, 7 * 10**6 * WAD, 3 * 10**6 * WAD]
+    o = exact_in_exact(xs, 0, 2, 10**5 * WAD)
+    assert abs(exact_out_exact(xs, 0, 2, o) - 10**5 * WAD) < 1
+    # invariant holds after a swap at the same r
+    r = radius_exact(xs)
+    xs2 = [D(xs[0]) + 10**5 * WAD, D(xs[1]), D(xs[2]) - o]
+    assert abs(sum((r - v) ** 2 for v in xs2) - r * r) < D(10) ** 30
+    print("ok")
+
+
+def gen_vectors(count=96, seed=33):
+    rng = random.Random(seed)
+    rows = []
+    while len(rows) < count:
+        n = rng.randint(2, 6)
+        base = rng.randint(10**3, 10**9) * WAD
+        # reserves within +/-40% of a common base keeps the sphere feasible
+        xs = [base * rng.randint(60, 140) // 100 + rng.randint(0, WAD) for _ in range(n)]
+        try:
+            radius_exact(xs)
+        except ValueError:
+            continue
+        i, j = rng.sample(range(n), 2)
+        d = xs[j] * rng.randint(1, 5000) // 10000 + rng.randint(0, WAD)
+        exact_out_flag = rng.random() < 0.5
+        try:
+            want = exact_out(xs, i, j, d) if exact_out_flag else exact_in(xs, i, j, d)
+        except ValueError:
+            continue
+        rows.append((xs, i, j, d, exact_out_flag, want, radius(xs)))
+    out = [
+        "// SPDX-License-Identifier: MIT",
+        "// GENERATED by scripts/orbital_ref.py vectors; do not edit.",
+        "pragma solidity ^0.8.26;",
+        "",
+        "library OrbitalVectors {",
+        "    struct V {",
+        "        uint256[] x;",
+        "        uint256 i;",
+        "        uint256 j;",
+        "        uint256 d;",
+        "        bool exactOut;",
+        "        uint256 want;",
+        "        uint256 r;",
+        "    }",
+        "",
+        f"    uint256 internal constant COUNT = {len(rows)};",
+        "",
+        "    function get(uint256 k) internal pure returns (V memory v) {",
+    ]
+    for k, (xs, i, j, d, eo, want, r) in enumerate(rows):
+        kw = "if" if k == 0 else "} else if"
+        out.append(f"        {kw} (k == {k}) {{")
+        out.append(f"            v.x = new uint256[]({len(xs)});")
+        for m, x in enumerate(xs):
+            out.append(f"            v.x[{m}] = {x};")
+        out.append(f"            (v.i, v.j, v.d, v.exactOut, v.want, v.r) = ({i}, {j}, {d}, {str(eo).lower()}, {want}, {r});")
+    out += ["        }", "    }", "}", ""]
+    return "\n".join(out)
+
+
+def main(argv):
+    abi = "--abi" in argv
+    argv = [a for a in argv if a != "--abi"]
+    cmd = argv[0] if argv else "selftest"
+    if cmd == "selftest":
+        return selftest()
+    if cmd == "vectors":
+        count = int(argv[1]) if len(argv) > 1 else 96
+        seed = int(argv[2]) if len(argv) > 2 else 33
+        sys.stdout.write(gen_vectors(count, seed))
+        return
+    xs = [int(v) for v in argv[1].split(",")]
+    if cmd == "radius":
+        res = radius(xs)
+    else:
+        i, j, d = int(argv[2]), int(argv[3]), int(argv[4])
+        try:
+            res = exact_in(xs, i, j, d) if cmd == "exact-in" else exact_out(xs, i, j, d)
+        except ValueError:
+            res = 2**256 - 1  # sentinel: Solidity side must revert
+    print("0x%064x" % res if abi else res)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
