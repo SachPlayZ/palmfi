@@ -9,7 +9,7 @@ import { formatDuration, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { Badge, Button, Card, Field, Input, Mono, Select, short } from "../ui";
-import { fmtAmount, safeParse, useRoles } from "./common";
+import { fmtAmount, outflowsOpen, safeParse, statusLabel, useRoles } from "./common";
 
 export function BalancesCard({ v }: { v: VaultView }) {
   const [held, supply] = v.s?.reserves ?? [0n, 0n];
@@ -58,7 +58,7 @@ export function BudgetCard({ v }: { v: VaultView }) {
     <Card title="Instant budget">
       <div className="flex items-baseline gap-2">
         <span className="tabular text-3xl font-semibold">{formatUsd(avail)}</span>
-        <span className="text-sm text-[var(--subtle)]">available now</span>
+        <span className="text-sm text-[var(--subtle)]">{outflowsOpen(v) ? "available now" : `paused while ${statusLabel(v)}`}</span>
       </div>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--muted)]" aria-hidden>
         <div className="h-full bg-[var(--accent)]" style={{ width: `${Math.min(100, pct)}%` }} />

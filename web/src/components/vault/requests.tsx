@@ -9,7 +9,7 @@ import { requestTimeline, voteProgress } from "@/lib/requests";
 import { TxStatus, useTx } from "@/lib/tx";
 import { useHasVoted, useScoringContext, type VaultRequest, type VaultView } from "@/lib/vault";
 import { Badge, Button, Card, Mono, short } from "../ui";
-import { eq, useNow, useRoles } from "./common";
+import { eq, outflowsOpen, statusLabel, useNow, useRoles } from "./common";
 
 const stateTone: Record<number, "gray" | "green" | "amber" | "red" | "blue"> = { 1: "blue", 2: "green", 3: "amber", 4: "gray", 5: "red", 6: "gray" };
 
@@ -38,6 +38,11 @@ function WhyDelay({ v, r }: { v: VaultView; r: VaultRequest }) {
           </li>
         ))}
       </ul>
+      {r.scored && a.score !== Number(r.score) && (
+        <p className="mt-1 text-amber-700 dark:text-amber-400">
+          Scored {formatBits(Number(r.score))} onchain; these are today&apos;s inputs. The Sentinel re-scores open requests when they change.
+        </p>
+      )}
       <p className="mt-1 text-[var(--subtle)]">Every {deployments.scoring.k / 1000} bits double the delay; ≥ {deployments.scoring.sFlag / 1000} bits freezes the Vault.</p>
     </div>
   );
@@ -106,8 +111,8 @@ function RequestRow({ v, r }: { v: VaultView; r: VaultRequest }) {
           </Button>
         )}
         {pending && t.ready && (
-          <Button onClick={() => send("execute", [r.id], "Execute")} disabled={tx.busy}>
-            Execute
+          <Button onClick={() => send("execute", [r.id], "Execute")} disabled={tx.busy || !outflowsOpen(v)}>
+            {outflowsOpen(v) ? "Execute" : `Execute (Vault ${statusLabel(v)})`}
           </Button>
         )}
         {pending && t.expired && (

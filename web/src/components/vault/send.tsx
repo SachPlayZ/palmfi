@@ -6,7 +6,7 @@ import { BOND, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { Badge, Button, Card, Field, Input, Mono, Notice } from "../ui";
-import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./common";
+import { eq, fmtAmount, outflowsOpen, safeParse, statusLabel, useDestination, useRoles } from "./common";
 
 /** Unwrap to an address or pay a Vault: instant within the budget, else a Queued request (1 USDC bond). */
 export function SendCard({ v }: { v: VaultView }) {
@@ -21,6 +21,7 @@ export function SendCard({ v }: { v: VaultView }) {
   const instant = !!amt && amt <= s.availableBudget;
   const need = amt ? (instant ? amt : amt + BOND) : 0n;
   const self = eq(d.address, v.vault);
+  const open = outflowsOpen(v);
 
   async function go() {
     if (!v.vault || !amt || !d.address) return;
@@ -31,7 +32,11 @@ export function SendCard({ v }: { v: VaultView }) {
 
   return (
     <Card title="Send">
-      {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to spend.</Notice>}
+      {!open ? (
+        <Notice tone="red">Outflows are stopped while this Vault is {statusLabel(v)}.</Notice>
+      ) : (
+        !roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to spend.</Notice>
+      )}
       <div className="mt-2 flex flex-col gap-3">
         <Field label="Amount (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
@@ -51,7 +56,7 @@ export function SendCard({ v }: { v: VaultView }) {
             {amt > s.hardCap && <span className="text-xs text-[var(--subtle)]">above the Hard cap: at least {Math.round(s.capDelay / 3600)}h unless a majority fast-tracks</span>}
           </div>
         )}
-        <Button onClick={go} disabled={!roles.isWallet || !amt || !d.address || self || myBal < need || tx.busy}>
+        <Button onClick={go} disabled={!open || !roles.isWallet || !amt || !d.address || self || myBal < need || tx.busy}>
           {amt && myBal < need ? `Not enough ${v.symbol} in this wallet` : instant ? (d.isVault ? "Pay now" : "Unwrap now") : "Queue request"}
         </Button>
         <TxStatus state={tx.state} />
