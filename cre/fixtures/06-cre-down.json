@@ -1,0 +1,10 @@
+{
+  "row": "CRE fully down",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "Point SEPOLIA_RPC_URL at a dead endpoint: no Verdict and no freeze are written on missing data.",
+  "expect": "\"requests\":[]",
+  "unitTest": "sentinel/failure-matrix.test.ts row 6",
+  "enabled": false
+}

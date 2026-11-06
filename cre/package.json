@@ -7,6 +7,7 @@
     "typecheck": "for p in hello shared sentinel reconciler; do (cd $p && bun run typecheck) || exit 1; done",
     "test": "for p in hello shared sentinel reconciler; do (cd $p && bun test) || exit 1; done",
     "build": "for p in sentinel reconciler; do (cd $p && bun cre-compile main.ts dist/$p.wasm) || exit 1; done",
-    "simulate": "bash scripts/simulate.sh"
+    "simulate": "bun scripts/simulate.ts",
+    "sync-config": "bun scripts/sync-config.ts"
   }
 }

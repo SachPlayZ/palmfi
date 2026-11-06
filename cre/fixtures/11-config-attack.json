@@ -1,0 +1,13 @@
+{
+  "row": "Config attack (add destination, change recovery)",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "Replay a ConfigChangeRequested (kind >= 6) on a Vault with an open request.",
+  "expect": "FLAG WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 11",
+  "enabled": false,
+  "event": "ConfigChangeRequested",
+  "evmTxHash": "",
+  "evmEventIndex": 0
+}

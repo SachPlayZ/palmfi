@@ -1,0 +1,10 @@
+{
+  "row": "Request flood to bury a large request",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "Many small Pending requests plus one large one to a Blocklisted address; the large one is scored first.",
+  "expect": "FLAG WRITTEN",
+  "unitTest": "sentinel/failure-matrix.test.ts row 9",
+  "enabled": false
+}

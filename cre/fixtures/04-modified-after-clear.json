@@ -1,0 +1,13 @@
+{
+  "row": "Request modified after CLEAR",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "Replay an UnwrapRequested whose request id now holds a different request hash; the Sentinel skips it.",
+  "expect": "SKIP_HASH_MISMATCH",
+  "unitTest": "sentinel/failure-matrix.test.ts row 4",
+  "enabled": false,
+  "event": "UnwrapRequested",
+  "evmTxHash": "",
+  "evmEventIndex": 0
+}

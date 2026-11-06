@@ -1,0 +1,10 @@
+{
+  "row": "Baseline: one Reconciler pass against the deployment",
+  "workflow": "reconciler",
+  "trigger": "cron",
+  "triggerIndex": 0,
+  "setup": "Hub deployed and its address synced into the configs (bun scripts/sync-config.ts).",
+  "expect": "\"heartbeat\":",
+  "unitTest": "reconciler/main.test.ts heartbeat",
+  "enabled": true
+}

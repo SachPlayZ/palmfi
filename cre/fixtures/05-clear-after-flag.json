@@ -1,0 +1,13 @@
+{
+  "row": "CLEAR after FLAG",
+  "workflow": "sentinel",
+  "trigger": "log",
+  "triggerIndex": 0,
+  "setup": "Replay a SecondFactorConfirmed for a request that is already Flagged.",
+  "expect": "SKIP_CLOSED",
+  "unitTest": "sentinel/failure-matrix.test.ts row 5",
+  "enabled": false,
+  "event": "SecondFactorConfirmed",
+  "evmTxHash": "",
+  "evmEventIndex": 0
+}
