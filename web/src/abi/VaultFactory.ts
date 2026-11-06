@@ -34,6 +34,16 @@ export const vaultFactoryAbi = [
             "internalType": "address"
           },
           {
+            "name": "verifier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "vaultModule",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "vaultImpl",
             "type": "address",
             "internalType": "address"
@@ -1018,6 +1028,19 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "vaultModule",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "vaultOf",
     "inputs": [
       {
@@ -1026,6 +1049,19 @@ export const vaultFactoryAbi = [
         "internalType": "string"
       }
     ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifier",
+    "inputs": [],
     "outputs": [
       {
         "name": "",

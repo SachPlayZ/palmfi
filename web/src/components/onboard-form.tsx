@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { isAddress, zeroAddress, zeroHash, type Address, type Hex } from "viem";
 import { useAccount, useReadContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
@@ -21,9 +21,13 @@ function addrList(s: string): Address[] {
     .filter(Boolean) as Address[];
 }
 
+const noSubscribe = () => () => {};
+
 export function OnboardForm({ mode }: { mode: "individual" | "institution" }) {
   const inst = mode === "institution";
   const { address } = useAccount();
+  // Browser-only capability: server render says unsupported so hydration matches, then the client re-reads it.
+  const canPasskey = useSyncExternalStore(noSubscribe, webAuthnSupported, () => false);
   const [label, setLabel] = useState("");
   const [ownerIn, setOwnerIn] = useState("");
   const [hot, setHot] = useState("");
@@ -207,7 +211,7 @@ export function OnboardForm({ mode }: { mode: "individual" | "institution" }) {
             Large requests need Face ID / Touch ID on this device. Laptop malware can steal a wallet key; it can&apos;t produce this.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant={passkey ? "secondary" : "primary"} onClick={makePasskey} disabled={!webAuthnSupported()}>
+            <Button variant={passkey ? "secondary" : "primary"} onClick={makePasskey} disabled={!canPasskey}>
               {passkey ? "Replace passkey" : "Create passkey"}
             </Button>
             {passkey && <Badge tone="green">P-256 key ready</Badge>}
