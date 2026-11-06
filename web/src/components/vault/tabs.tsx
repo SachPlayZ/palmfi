@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { erc20Abi, formatUnits } from "viem";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract, useWatchAsset } from "wagmi";
 import { ago, useVaultActivity, type Activity } from "@/lib/activity";
 import { useNames } from "@/lib/hub";
 import { arcTestnet, network, txUrl } from "@/lib/network";
@@ -79,9 +79,13 @@ function BalanceHero() {
   const stats = [
     { k: "Spendable now", v: formatUsd(spendable), d: "within the instant budget" },
     { k: "Queued out", v: formatUsd(queued), d: "waiting for review" },
-    ...(roles.isWallet && mine !== undefined ? [{ k: `Your ${v.symbol}`, v: formatUsd(mine), d: "held by your wallet" }] : []),
-    ...(address && walletUsdc.data !== undefined ? [{ k: "USDC in your wallet", v: formatUsd(walletUsdc.data), d: "not yet deposited" }] : []),
-  ];
+    ...(roles.isWallet && mine !== undefined
+      ? [{ k: `Your ${v.symbol}`, v: formatUsd(mine), d: "held by your wallet", watch: v.s?.token ? { address: v.s.token, symbol: v.symbol } : undefined }]
+      : []),
+    ...(address && walletUsdc.data !== undefined
+      ? [{ k: "USDC in your wallet", v: formatUsd(walletUsdc.data), d: "not yet deposited", watch: { address: network.usdc, symbol: "USDC" } }]
+      : []),
+  ] as { k: string; v: string; d: string; watch?: { address: `0x${string}`; symbol: string } }[];
   return (
     <section className="pf-card overflow-hidden !p-0">
       <div className="flex flex-wrap items-end justify-between gap-6 p-6 sm:p-8">
@@ -111,7 +115,10 @@ function BalanceHero() {
           <div key={x.k} className="flex flex-col gap-1 border-r border-[var(--line)] px-6 py-4 last:border-r-0">
             <dt className="pf-mono pf-dim">{x.k}</dt>
             <dd className="text-[20px] font-medium tabular-nums">{x.v}</dd>
-            <span className="text-[12px] text-[var(--subtle)]">{x.d}</span>
+            <span className="flex flex-wrap items-center gap-x-2 text-[12px] text-[var(--subtle)]">
+              {x.d}
+              {x.watch && <AddToWallet {...x.watch} />}
+            </span>
           </div>
         ))}
       </dl>
@@ -144,6 +151,21 @@ function BalanceHero() {
         </div>
       </Modal>
     </section>
+  );
+}
+
+/** Ask the connected wallet to show a token (EIP-747 wallet_watchAsset). */
+function AddToWallet({ address, symbol }: { address: `0x${string}`; symbol: string }) {
+  const w = useWatchAsset();
+  return (
+    <button
+      type="button"
+      className="pf-link text-[12px] text-[var(--ink)]"
+      disabled={w.isPending}
+      onClick={() => w.watchAsset({ type: "ERC20", options: { address, symbol: symbol.slice(0, 11), decimals: 6 } })}
+    >
+      {w.isSuccess ? "Added ✓" : w.isPending ? "Check your wallet…" : "+ Add to wallet"}
+    </button>
   );
 }
 
