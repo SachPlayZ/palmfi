@@ -17,15 +17,24 @@ jobs:
           submodules: true
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge build --sizes
-      # Fork tests read a pinned Arc block; the cached RPC state keeps the public RPC's rate limit out of CI.
-      - uses: actions/cache@v4
+      # Fork tests read a pinned Arc block. The RPC state cache is saved even when tests fail, and retries with
+      # backoff keep the public RPC's rate limit (429) out of CI.
+      - uses: actions/cache/restore@v4
         with:
           path: ~/.foundry/cache/rpc
-          key: foundry-rpc-arc-71037000
-      - run: forge test -vv --jobs 2
+          key: foundry-rpc-arc-71037000-${{ github.run_id }}
+          restore-keys: foundry-rpc-arc-71037000-
+      - run: >-
+          forge test -vv --jobs 2 --fork-url "$ARC_RPC_URL" --fork-block-number "$FORK_BLOCK"
+          --fork-retries 10 --fork-retry-backoff 3000 --compute-units-per-second 300
         env:
           ARC_RPC_URL: ${{ secrets.ARC_RPC_URL || 'https://rpc.testnet.arc.network' }}
           FORK_BLOCK: 71037000
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.foundry/cache/rpc
+          key: foundry-rpc-arc-71037000-${{ github.run_id }}
 
   cre:
     runs-on: ubuntu-latest
