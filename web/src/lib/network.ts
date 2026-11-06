@@ -10,7 +10,11 @@ export const network = {
   chainId: sepoliaConfig.chainId,
   tokens: sepoliaConfig.tokens as Record<"usdc" | "weth" | "link", Address>,
   uniswap: sepoliaConfig.uniswap as Record<keyof typeof sepoliaConfig.uniswap, Address>,
-  feeds: sepoliaConfig.feeds as Record<keyof typeof sepoliaConfig.feeds, Address>,
+  feeds: {
+    ethUsd: sepoliaConfig.feeds.ethUsd as Address,
+    usdcUsd: sepoliaConfig.feeds.usdcUsd as Address,
+    linkUsd: sepoliaConfig.feeds.linkUsd as Address,
+  },
   ensParent: `${sepoliaConfig.ens.parentLabel}.eth`,
 };
 

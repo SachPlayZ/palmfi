@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "predev": "node scripts/sync-deployments.mjs",
     "build": "next build",
+    "prebuild": "node scripts/sync-deployments.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "abi": "node scripts/export-abi.mjs",
+    "sync:deployments": "node scripts/sync-deployments.mjs"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.11",
