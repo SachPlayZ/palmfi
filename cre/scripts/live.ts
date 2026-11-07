@@ -428,11 +428,15 @@ let rateLimited = false;
 async function watch() {
   const fromOpt = opt("--from-block");
   let last = fromOpt && /^\d+$/.test(fromOpt) ? BigInt(fromOpt) - 1n : await client.getBlockNumber();
+  // Free-tier RPCs (Alchemy) cap eth_getLogs at 10 blocks; Arc outruns that per poll, so catch up without sleeping.
+  let span = 1000n;
+  let behind = false;
   for (;;) {
     try {
       const head = await client.getBlockNumber();
+      behind = false;
       if (head > last) {
-        const to = head - last > 1000n ? last + 1000n : head;
+        const to = head - last > span ? last + span : head;
         const raw = await client.getLogs({ address: HUB, fromBlock: last + 1n, toBlock: to });
         const byTx = new Map<Hex, HubLog[]>();
         for (const r of raw) {
@@ -447,16 +451,22 @@ async function watch() {
         }
         for (const [h, ls] of byTx) await onTx(h, ls);
         last = to;
+        behind = to < head;
       }
     } catch (e) {
       const msg = (e as Error).message.split("\n")[0];
+      if (span > 10n && /block range/i.test((e as Error).message)) {
+        span = 10n;
+        at(c.gray("RPC caps eth_getLogs at 10 blocks; polling in 10-block chunks"));
+        continue;
+      }
       if (/limit|429/i.test(msg)) {
         if (!rateLimited) at(c.gray("RPC rate-limited, backing off (set ARC_RPC_URL to a private endpoint)"));
         rateLimited = true;
         await new Promise((r) => setTimeout(r, POLL_MS * 2));
       } else at(c.red(`RPC: ${msg}`));
     }
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    if (!behind) await new Promise((r) => setTimeout(r, POLL_MS));
   }
 }
 
