@@ -65,7 +65,7 @@ type Action = (typeof ACTIONS)[number];
 function BalanceHero() {
   const v = useV();
   const [open, setOpen] = useState<Action | null>(null);
-  const [sendMode, setSendMode] = useState<"name" | "direct">("name");
+  const [sendMode, setSendMode] = useState<"direct" | "pool">("direct");
   const close = useCallback(() => setOpen(null), []);
   // ?action=send|deposit|receive|liquidity opens that modal (old /send links and other pages point here).
   const params = useSearchParams();
@@ -147,8 +147,8 @@ function BalanceHero() {
         <div className="mx-4 mt-3 grid grid-cols-2 gap-1 rounded-full bg-[var(--paper-2)] p-1 text-[14px]">
           {(
             [
-              ["name", "Pay a vault by name"],
-              ["direct", "Withdraw to an address"],
+              ["direct", "Pay a vault or address"],
+              ["pool", "Via Orbital pool"],
             ] as const
           ).map(([k, l]) => (
             <button
@@ -161,7 +161,7 @@ function BalanceHero() {
             </button>
           ))}
         </div>
-        {sendMode === "name" ? <PoolPayCard v={v} /> : <SendCard v={v} />}
+        {sendMode === "direct" ? <SendCard v={v} /> : <PoolPayCard v={v} />}
       </Modal>
       <Modal open={open === "liquidity"} onClose={close} title="Pool liquidity">
         <LiquidityCard v={v} />

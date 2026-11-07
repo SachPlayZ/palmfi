@@ -14,10 +14,10 @@ import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./common";
  * a quiet one within the budget clears at zero delay (no bond), anything else waits. CRE down: the direct
  * instant lane within the budget, as before.
  */
-export function SendCard({ v }: { v: VaultView }) {
+export function SendCard({ v, initialTo = "", initialAmount = "" }: { v: VaultView; initialTo?: string; initialAmount?: string }) {
   const roles = useRoles(v);
-  const [amount, setAmount] = useState("");
-  const [dest, setDest] = useState("");
+  const [amount, setAmount] = useState(initialAmount);
+  const [dest, setDest] = useState(initialTo);
   const tx = useTx();
   const s = v.s!;
   const amt = safeParse(amount);

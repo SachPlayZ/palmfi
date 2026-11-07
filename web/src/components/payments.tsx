@@ -13,9 +13,9 @@ import { arcTestnet, txUrl } from "@/lib/network";
 import { isValidName } from "@/lib/palm";
 import { useVault, useVaultAddress } from "@/lib/vault";
 import { AddressChip, CopyButton, EmptyState, OrgCard, PageHead, Skeleton, WalletGate, useHref, useOrigin } from "./brand";
-import { PoolPayCard } from "./pay";
 import { Badge, Field, Input, Notice } from "./ui";
 import { fmtAmount } from "./vault/common";
+import { SendCard } from "./vault/send";
 
 const chainId = arcTestnet.id;
 
@@ -26,7 +26,7 @@ function PayFrom({ id, to, amount }: { id: string; to: string; amount: string })
   const v = useVault(vault);
   if (notFound) return <Notice tone="amber">No vault called “{id}”.</Notice>;
   if (isLoading || v.isLoading || !v.s) return <Skeleton h={360} className="rounded-[18px]" />;
-  return <PoolPayCard key={`${id}-${to}`} v={v} initialTo={to} initialAmount={amount} />;
+  return <SendCard key={`${id}-${to}`} v={v} initialTo={to} initialAmount={amount} />;
 }
 
 export function PayFlow() {
@@ -49,7 +49,7 @@ export function PayFlow() {
         index="(Pay)"
         title={isRequest ? `Pay ${to}` : "Pay any org"}
         em={isRequest ? "from your vault." : "by name."}
-        lede="You pay in your own Protected token through the Orbital pool; they receive theirs. Your budget and your team's controls apply as usual."
+        lede="Your Protected token is burned in your vault; they receive theirs, minted 1:1 in theirs. Your budget and your team's controls apply as usual."
       />
       {isRequest && (
         <div className="pf-card flex flex-wrap items-center gap-6" style={{ animation: "pf-fade .8s var(--ease) .2s both" }}>
@@ -292,7 +292,7 @@ export function RequestLink() {
         index="(Request a payment)"
         title="Send a link,"
         em="get paid by name."
-        lede="Anyone with a palmfi vault opens the link and pays you through the Orbital pool. Nothing is stored: the link carries the details."
+        lede="Anyone with a palmfi vault opens the link and pays you vault to vault. Nothing is stored: the link carries the details."
       />
       <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
         <div className="pf-card flex flex-col gap-5" data-pf>
