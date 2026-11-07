@@ -1,3 +1,5 @@
+<img src="web/src/app/icon.svg" width="72" height="72" alt="palmfi logo">
+
 # palmfi
 
 **Your keys can be stolen. Your treasury can't leave faster than your team can say no.**
