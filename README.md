@@ -8,6 +8,19 @@ palmfi gives every organisation a protected USDC vault on **Arc**. Small payment
 
 Built at ETHGlobal Mumbai (Nov 5–7, 2026). Full design: [`brief.md`](brief.md) · decisions: [`docs/adr/`](docs/adr) · demo script: [`docs/demo.md`](docs/demo.md).
 
+## Submission
+
+**Submitting for:** Arc (built in Arc Studio) · Chainlink CRE (orchestration layer) · Uniswap v4 (Orbital hook)
+
+| | |
+|---|---|
+| Demo video | _TODO: add link_ (shows Arc Studio, the CRE simulation and the app) |
+| Arc Studio project | https://studio.arc.io/app/bd02f044-7cea-4167-b4b8-b41c3dc41502 |
+| Live app | _TODO: add link_ |
+| Architecture diagram | [How it works](#how-it-works) · [`docs/cre-architecture.html`](docs/cre-architecture.html) |
+| CRE simulation proof | [below](#cre-simulation-proof) |
+| Uniswap v4 developer feedback | [`FEEDBACK.md`](FEEDBACK.md) (https://github.com/SachPlayZ/palmfi/blob/main/FEEDBACK.md), submitted via the [Uniswap feedback form](https://developers.uniswap.org/hackathon-feedback) |
+
 ## Why
 
 On Oct 29, 2026 attackers got an exchange's own signing infrastructure to sign for them, and billions left hot wallets in under an hour. The lesson: assume the attacker can produce **valid signatures**. palmfi limits what any one valid signature can do right now, and puts the rest behind a delay that the rest of the team controls. Unless more than half of an org's wallets are compromised, an attacker can't move more than the budget before someone can say no.
@@ -83,6 +96,17 @@ Uniswap v4 PoolManager on Arc: `0x1d70945634f618eefdf9edaadb59b9a183cef929`. USD
 
 - **Arc Studio**, driven from Claude Code through the `arc-studio` CLI (`@circle-fin/arc-studio-cli`): we cloned this repo into a Studio app, and Studio built the Foundry project, ran the full test suite on an Arc fork, and ran a security review with runnable PoCs. All 8 PoCs reproduced against our code; we fixed 7 findings with regression tests ([`contracts/test/AuditFixes.t.sol`](contracts/test/AuditFixes.t.sol)) and recorded the rest as decisions ([`docs/audits/arc-studio-2026-11-06-resolution.md`](docs/audits/arc-studio-2026-11-06-resolution.md)). The contracts were then redeployed.
 - **Circle USDC on Arc:** the Vault takes USDC through the ERC-20 interface only, so 18-decimal native gas and 6-decimal token amounts never mix. Test USDC from [faucet.circle.com](https://faucet.circle.com).
+
+## CRE simulation proof
+
+The Sentinel scored a real queued request on Arc testnet through `cre workflow simulate --broadcast`:
+
+- RequestQueued tx: _TODO: arcscan link_
+- Report write (`SET_DELAY` / `FLAG`) tx: _TODO: arcscan link_
+
+```
+TODO: paste the "Workflow Simulation Result" output from the CRE CLI
+```
 
 ## Repo layout
 
