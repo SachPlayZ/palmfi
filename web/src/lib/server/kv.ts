@@ -12,6 +12,9 @@ export function kvFromEnv(env: Record<string, string | undefined> = process.env,
   const url = env.KV_REST_API_URL ?? env.UPSTASH_REDIS_REST_URL;
   const token = env.KV_REST_API_TOKEN ?? env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) return upstashKv(url, token, f);
+  // Vercel's own Redis (and any redis:// server) only sets REDIS_URL.
+  const redisUrl = env.REDIS_URL ?? env.KV_URL;
+  if (redisUrl) return redisKv(redisUrl);
   // Local dev without Vercel KV: keep links in process memory (lost on restart).
   if (env.NODE_ENV !== "production") return memoryKv();
   return null;
@@ -55,3 +58,26 @@ export function upstashKv(url: string, token: string, f: typeof fetch = fetch): 
 }
 
 export const chatKey = (vault: string) => `palmfi:chat:${vault.toLowerCase()}`;
+
+/** TCP Redis client for REDIS_URL, one connection reused across warm invocations. */
+export function redisKv(url: string): KV {
+  const g = globalThis as { __palmfiRedis?: Promise<import("redis").RedisClientType> };
+  const client = () =>
+    (g.__palmfiRedis ??= import("redis").then(async ({ createClient }) => {
+      const c = createClient({ url }) as import("redis").RedisClientType;
+      c.on("error", () => {});
+      await c.connect();
+      return c;
+    }).catch((e) => {
+      g.__palmfiRedis = undefined;
+      throw e;
+    }));
+  return {
+    async get(key) {
+      return (await client()).get(key);
+    },
+    async set(key, value) {
+      await (await client()).set(key, value);
+    },
+  };
+}
