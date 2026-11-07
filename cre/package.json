@@ -10,5 +10,8 @@
     "simulate": "bun scripts/simulate.ts",
     "sync-config": "bun scripts/sync-config.ts",
     "live": "bun scripts/live.ts"
+  },
+  "devDependencies": {
+    "viem": "^2.54.2"
   }
 }
