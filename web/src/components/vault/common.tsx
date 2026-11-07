@@ -6,6 +6,7 @@ import { useAccount, useReadContract } from "wagmi";
 import { hubAbi, vaultFactoryAbi } from "@/abi";
 import { deployments } from "@/lib/deployments";
 import { arcTestnet } from "@/lib/network";
+import { STATUS, STATUS_LABEL } from "@/lib/palm";
 import type { VaultView } from "@/lib/vault";
 
 export function useNow(intervalMs = 1000): number {
@@ -16,6 +17,10 @@ export function useNow(intervalMs = 1000): number {
   }, [intervalMs]);
   return now;
 }
+
+/** Unwraps, payments, requests and executes need an Active Vault (the contracts' outflowsOpen). */
+export const outflowsOpen = (v: VaultView) => v.status === STATUS.ACTIVE;
+export const statusLabel = (v: VaultView) => (v.status !== undefined ? STATUS_LABEL[v.status] : "inactive");
 
 export const eq = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
 

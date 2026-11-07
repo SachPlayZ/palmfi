@@ -90,7 +90,7 @@ Every Voter gets a Telegram alert on long delays, FLAGs and settings changes, so
 
 Uniswap v4 PoolManager on Arc: `0x1d70945634f618eefdf9edaadb59b9a183cef929`. USDC ERC-20: `0x3600000000000000000000000000000000000000`.
 
-**Arc Studio project:** https://studio.arc.io/app/bd02f044-7cea-4167-b4b8-b41c3dc41502
+**Arc Studio project:** https://studio.arc.io/app/a765643e-c13a-44c0-a56e-35236b3d1ef3
 
 ## How we used Arc Studio and Circle tools
 

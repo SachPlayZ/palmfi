@@ -10,8 +10,8 @@ import { formatDuration, formatUsd } from "@/lib/palm";
 import { TxStatus, useTx } from "@/lib/tx";
 import type { VaultView } from "@/lib/vault";
 import { AddressChip, Meter, Ring } from "../brand";
-import { Badge, Button, Card, Field, Input, Select } from "../ui";
-import { fmtAmount, safeParse, useRoles } from "./common";
+import { Badge, Button, Card, Field, Input, Mono, Select, short } from "../ui";
+import { fmtAmount, outflowsOpen, safeParse, statusLabel, useRoles } from "./common";
 
 export function BalancesCard({ v }: { v: VaultView }) {
   const [held, supply] = v.s?.reserves ?? [0n, 0n];
@@ -66,7 +66,7 @@ export function BudgetCard({ v }: { v: VaultView }) {
         <div className="flex flex-col gap-1">
           <span className="pf-big">{formatUsd(now)}</span>
           <span className="pf-mono pf-dim">
-            {v.totalTokens === 0n ? "deposit USDC to start spending" : `spendable now · ${formatUsd(left)} of limit left`}
+            {v.totalTokens === 0n ? "deposit USDC to start spending" : !outflowsOpen(v) ? `paused while ${statusLabel(v)}` : `spendable now · ${formatUsd(left)} of limit left`}
           </span>
         </div>
       </div>

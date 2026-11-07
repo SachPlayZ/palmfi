@@ -8,7 +8,7 @@ Live on the deployment in [`deployments/arc.json`](../deployments/arc.json). Amo
 - [ ] `cd web && pnpm dev`, open http://localhost:3000. Close other tabs and scripts that use the public Arc RPC (it rate-limits at load).
 - [ ] `cre` CLI on PATH, `cre/.env` set (`CRE_ETH_PRIVATE_KEY`, `ARC_RPC_URL`).
 - [ ] A **payroll history** on nvidia, so the Sentinel has a baseline: about 8 small payments ($3–6) from different wallets to one payee address, made with `Send` before the demo. Scores below assume about 12 such outflows.
-- [ ] The Arc Studio app open: https://studio.arc.io/app/bd02f044-7cea-4167-b4b8-b41c3dc41502
+- [ ] The Arc Studio app open: https://studio.arc.io/app/a765643e-c13a-44c0-a56e-35236b3d1ef3
 - [ ] Telegram linked for at least one nvidia wallet (dashboard, Notifications card).
 - [ ] nvidia marked verified, so its FLAG also blocklists the destination (Hub admin): `cast send <hub> "setVerified(address,bool)" <nvidia vault> true --rpc-url $ARC_RPC_URL --account <keystore>`.
 - [ ] Onboard with business hours (UTC) that cover the demo time; the scores below are for in-hours requests.
@@ -50,7 +50,7 @@ With nvidia frozen, as `p1` try to pay `nvidia` again: the quote fails (`FrozenT
 
 ### 6. Chainlink CRE and Arc Studio (30s)
 - `cd cre && bun run simulate`: the failure-matrix fixtures recorded on Arc (baseline heartbeat, replay skipped, baseline poisoning still UNUSUAL_AMOUNT, Sybil re-score, frozen Vault skipped). Logs: [`cre/fixtures/logs/`](../cre/fixtures/logs).
-- Arc Studio: the app's chat shows the build, the 58/58 test run on an Arc fork and the security review; [`docs/audits/`](audits) shows the 7 fixes that came out of it.
+- Arc Studio: the app's chat shows the clone of this repo at `v2-arc-core`, its build and the 66/66 test run on an Arc fork. The security review ran in the first Studio project; [`docs/audits/`](audits) has its report and the 7 fixes that came out of it.
 
 **Close:** *Your keys can be stolen. Your money can't leave faster than your team can say no.*
 

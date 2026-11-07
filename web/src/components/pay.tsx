@@ -14,7 +14,7 @@ import type { VaultView } from "@/lib/vault";
 import { hubAbi } from "@/abi";
 import { OrgCard } from "./brand";
 import { Badge, Button, Card, Field, Input, Mono, Notice, StatusBadge, short } from "./ui";
-import { eq, fmtAmount, safeParse, useDestination, useRoles } from "./vault/common";
+import { eq, fmtAmount, outflowsOpen, safeParse, statusLabel, useDestination, useRoles } from "./vault/common";
 
 const chainId = arcTestnet.id;
 
@@ -92,7 +92,11 @@ export function PoolPayCard({ v, initialTo = "", initialAmount = "" }: { v: Vaul
 
   return (
     <Card label="Orbital pool" title="Pay an org by name">
-      {!roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to pay.</Notice>}
+      {!outflowsOpen(v) ? (
+        <Notice tone="red">Pool payments are stopped while this Vault is {statusLabel(v)}.</Notice>
+      ) : (
+        !roles.isWallet && <Notice tone="amber">Connect one of this Vault&apos;s wallets to pay.</Notice>
+      )}
       <div className="mt-2 flex flex-col gap-3">
         <Field
           label="Payee"
@@ -129,7 +133,7 @@ export function PoolPayCard({ v, initialTo = "", initialAmount = "" }: { v: Vaul
             )}
           </p>
         )}
-        <Button onClick={go} disabled={!roles.isWallet || !d.isVault || self || !amt || amountIn === undefined || overBudget || myBal < (maxIn ?? 0n) || p.status === STATUS.FROZEN || (needsClearance && !!waiting) || tx.busy}>
+        <Button onClick={go} disabled={!outflowsOpen(v) || !roles.isWallet || !d.isVault || self || !amt || amountIn === undefined || overBudget || myBal < (maxIn ?? 0n) || p.status === STATUS.FROZEN || (needsClearance && !!waiting) || tx.busy}>
           {needsClearance ? (waiting ? "Waiting for clearance…" : "Request clearance") : needsApprove ? `Approve ${v.symbol}` : "Pay via Orbital pool"}
         </Button>
         <TxStatus state={tx.state} />
