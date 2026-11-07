@@ -1,42 +1,57 @@
 @import "tailwindcss";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* The app is light-only, like the landing: `dark:` utilities never apply. */
+@custom-variant dark (&:where(.pf-dark, .pf-dark *));
 
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
+  --background: #fdfdfb;
+  --foreground: #1b1b18;
   --card: #ffffff;
-  --muted: #f0efed;
-  --border: #e2e0dc;
-  --subtle: #6b6660;
-  --accent: #1f4d3a;
-  --accent-fg: #ffffff;
+  --muted: #f2f1ec;
+  --border: #e6e4dd;
+  --subtle: #75726a;
+  --accent: #1b1b18;
+  --accent-fg: #fdfdfb;
+
+  --ink: #1b1b18;
+  --ink-2: #44423c;
+  --paper: #fdfdfb;
+  --paper-2: #f2f1ec;
+  --line: #e6e4dd;
+  --forest: #1d3a2a;
+  --leaf: #3f7d3a;
+  --moss: #8dbd6b;
+  --butter: #e9d95c;
+  --butter-ink: #8a7a12;
+  --lime: #cfe86a;
+  --amber: #c8962e;
+  --red: #d8452f;
+  --sky: #a9c4ec;
+  --ease: cubic-bezier(0.22, 0.7, 0.12, 1);
+  --g: clamp(16px, 4vw, 56px);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: var(--font-display), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-site), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f0f0e;
-    --foreground: #ecebe8;
-    --card: #181816;
-    --muted: #24231f;
-    --border: #2f2e2a;
-    --subtle: #9c978f;
-    --accent: #6fcf97;
-    --accent-fg: #0b1d13;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans);
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--butter);
+  color: var(--ink);
 }
 
 .tabular {

@@ -60,6 +60,10 @@ _Avoid_: Network transfer, burn-and-mint
 Redeeming a foreign token the Orbital pool holds from its issuer's Vault into the under-supplied token's Vault.
 _Avoid_: Rebalance, netting
 
+**Lifeline**:
+A payment a Frozen Vault makes to a counterparty it already paid, approved by its Recovery key and a wallet majority, fronted by the Orbital pool and repaid from the frozen reserves once the freeze resolves (ADR-0013).
+_Avoid_: Emergency loan, credit line, bridge loan
+
 **Unwrap**:
 Turning Protected tokens back into the Underlying, sent to a destination.
 _Avoid_: Withdrawal, redeem

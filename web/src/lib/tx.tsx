@@ -16,6 +16,20 @@ export type WriteParams = {
   value?: bigint;
 };
 
+/**
+ * CRE live monitor bridge (cre/scripts/live.ts): each button press and its tx are posted to the local
+ * terminal monitor so the demo shows which CRE workflow the action triggers. Dev-only by default; set
+ * NEXT_PUBLIC_CRE_LIVE_URL to point elsewhere or to "" to turn it off. Fire-and-forget, never blocks a tx.
+ */
+const CRE_LIVE_URL =
+  process.env.NEXT_PUBLIC_CRE_LIVE_URL ?? (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8788" : "");
+
+function creLive(event: { phase: TxState["status"]; label: string; functionName?: string; hash?: Hash; message?: string; account?: string }) {
+  if (!CRE_LIVE_URL) return;
+  // text/plain keeps it a CORS "simple" request (no preflight).
+  fetch(CRE_LIVE_URL, { method: "POST", body: JSON.stringify(event), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {});
+}
+
 export type TxState = { status: "idle" | "pending" | "mining" | "done" | "error"; hash?: Hash; message?: string };
 
 /** Human-readable error from a viem/wagmi failure, naming custom errors (e.g. OverBudget) when decodable. */
@@ -63,7 +77,7 @@ const hints: Record<string, string> = {
 export function useTx() {
   const config = useConfig();
   const chainId = useChainId();
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const qc = useQueryClient();
   const [state, setState] = useState<TxState>({ status: "idle" });
@@ -74,22 +88,28 @@ export function useTx() {
         setState({ status: "error", message: "Connect a wallet first" });
         return false;
       }
+      const live = { label, functionName: params.functionName, account: address };
+      let hash: Hash | undefined;
       try {
         if (chainId !== arcTestnet.id) await switchChainAsync({ chainId: arcTestnet.id });
         setState({ status: "pending", message: `${label}: confirm in your wallet` });
-        const hash = await writeContract(config, { ...params, chainId: arcTestnet.id } as Parameters<typeof writeContract>[1]);
+        creLive({ ...live, phase: "pending" });
+        hash = await writeContract(config, { ...params, chainId: arcTestnet.id } as Parameters<typeof writeContract>[1]);
         setState({ status: "mining", hash, message: `${label}: waiting for Arc` });
+        creLive({ ...live, phase: "mining", hash });
         const receipt = await waitForTransactionReceipt(config, { hash, chainId: arcTestnet.id });
         if (receipt.status !== "success") throw new Error(`${label} reverted`);
         setState({ status: "done", hash, message: `${label}: confirmed` });
+        creLive({ ...live, phase: "done", hash });
         await qc.invalidateQueries();
         return true;
       } catch (e) {
         setState({ status: "error", message: `${label}: ${explainError(e)}` });
+        creLive({ ...live, phase: "error", hash, message: explainError(e) });
         return false;
       }
     },
-    [config, chainId, isConnected, switchChainAsync, qc],
+    [config, chainId, isConnected, address, switchChainAsync, qc],
   );
 
   return { state, send, setState, busy: state.status === "pending" || state.status === "mining" };
@@ -97,18 +117,14 @@ export function useTx() {
 
 export function TxStatus({ state }: { state: TxState }) {
   if (state.status === "idle" || !state.message) return null;
-  const color =
-    state.status === "error" ? "text-red-600 dark:text-red-400" : state.status === "done" ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--subtle)]";
   return (
-    <p className={`mt-2 text-xs ${color}`} role="status" aria-live="polite">
-      {state.message}
+    <p className={`pf-tx ${state.status}`} role="status" aria-live="polite">
+      <span className="dot" aria-hidden />
+      <span className="min-w-0">{state.message}</span>
       {state.hash && (
-        <>
-          {" "}
-          <a className="underline" href={txUrl(state.hash)} target="_blank" rel="noreferrer">
-            view
-          </a>
-        </>
+        <a href={txUrl(state.hash)} target="_blank" rel="noreferrer">
+          view
+        </a>
       )}
     </p>
   );

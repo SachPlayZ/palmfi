@@ -159,6 +159,102 @@ export const vaultFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "createVaultWithPool",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "cfg",
+        "type": "tuple",
+        "internalType": "struct PalmTypes.VaultConfig",
+        "components": [
+          {
+            "name": "wallets",
+            "type": "address[]",
+            "internalType": "address[]"
+          },
+          {
+            "name": "recoveryKey",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "recoveryVault",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "budget24h",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "budget7d",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "hardCap",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "floorDelay",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "maxDelay",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "capDelay",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "destinations",
+            "type": "address[]",
+            "internalType": "address[]"
+          },
+          {
+            "name": "bizStartHourUtc",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bizEndHourUtc",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "usualMaxPayout",
+            "type": "uint128",
+            "internalType": "uint128"
+          }
+        ]
+      },
+      {
+        "name": "joinPool",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "v",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "defaultDelegates",
     "inputs": [],
     "outputs": [
@@ -292,6 +388,25 @@ export const vaultFactoryAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "PoolSeat",
+    "inputs": [
+      {
+        "name": "vault",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "seated",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",

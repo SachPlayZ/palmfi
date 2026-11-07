@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useAccount } from "wagmi";
+import { useMyVaults } from "@/lib/hub";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 /* ───────────────────────── helpers ───────────────────────── */
@@ -225,43 +227,6 @@ function Hills({ className, speed = 1, sky = ["#ffffff", "#fbf9ef", "#f4ecc0"] }
   return <canvas ref={ref} className={`m-hills ${className ?? ""}`} aria-hidden />;
 }
 
-/* ───────────────────────── nav ───────────────────────── */
-
-function Nav() {
-  const [state, setState] = useState({ solid: false, hide: false });
-  useEffect(() => {
-    let last = window.scrollY;
-    const on = () => {
-      const y = window.scrollY;
-      setState({ solid: y > 24, hide: y > 500 && y > last });
-      last = y;
-      document.documentElement.style.setProperty("--doc-p", (y / Math.max(1, document.body.scrollHeight - innerHeight)).toFixed(4));
-    };
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
-  return (
-    <header className={`m-nav ${state.solid ? "solid" : ""} ${state.hide ? "hide" : ""}`}>
-      <div className="m-progress" />
-      <Link href="/" className="m-logo" aria-label="palmfi home">
-        <Mark />
-        <span>palmfi</span>
-      </Link>
-      <nav className="m-links">
-        <a href="#lanes">Lanes</a>
-        <a href="#try">Try it</a>
-        <a href="#sentinel">Sentinel</a>
-        <a href="#network">Orbital pool</a>
-        <a href="#pieces">Protocol</a>
-      </nav>
-      <Link href="/onboard" className="m-pill">
-        Open a vault
-      </Link>
-    </header>
-  );
-}
-
 function Mark() {
   return (
     <svg className="m-mark" viewBox="0 0 24 24" aria-hidden>
@@ -281,9 +246,9 @@ const LANE_OF = (i: number) => (i < 4 ? 0 : i < 11 ? 1 : i < 14 ? 2 : 3);
 const LANE_COL = ["#3f7d3a", "#cdb935", "#1d3a2a", "#8dbd6b"];
 const LANE_LBL = [
   { t: "INSTANT BUDGET · 24H / 7D", x: 960, y: 92, a: "end" },
-  { t: "QUEUED · DELAY GROWS WITH SURPRISE", x: 770, y: 318, a: "middle" },
+  { t: "QUEUED · REVIEWED BEFORE IT LEAVES", x: 770, y: 318, a: "middle" },
   { t: "YOUR WALLETS VOTE", x: 762, y: 382, a: "middle" },
-  { t: "RECOVERY VAULT · FIXED AT ONBOARDING", x: 960, y: 470, a: "end" },
+  { t: "RECOVERY VAULT · SET UP FRONT", x: 960, y: 470, a: "end" },
 ] as const;
 
 function lanePath(i: number) {
@@ -303,10 +268,10 @@ function lanePath(i: number) {
 }
 
 const CAPS = [
-  { k: "The drain", t: "One valid signature. One transaction. $2.5B gone." },
-  { k: "The gate", t: "A palmfi vault puts a gate where a signature can't reach." },
-  { k: "The lanes", t: "Past the gate, every payment takes a lane." },
-  { k: "The brake", t: "A stolen key only buys the budget. The rest waits for your team." },
+  { k: "Your treasury", t: "All your team's USDC, in one place." },
+  { k: "One vault", t: "Every payment passes through your palmfi vault." },
+  { k: "Smart lanes", t: "Each payment takes the right lane, automatically." },
+  { k: "Your call", t: "Everyday spend flies. Big moves get your team's nod." },
 ];
 
 function Hero() {
@@ -332,7 +297,7 @@ function Hero() {
             ))}
           </g>
           <text className="m-flow-note" x="960" y="40" textAnchor="end" style={{ opacity: clamp((p - 0.1) * 8) * (1 - clamp((p - 0.3) * 8)) }}>
-            $2.5B · ONE TRANSACTION · NO WAY TO SAY NO
+            EVERY PAYMENT · ONE VAULT · YOUR RULES
           </text>
           <g className="m-flow-lanes">
             {Array.from({ length: NL }, (_, i) => {
@@ -366,7 +331,7 @@ function Hero() {
           <circle className="m-flow-src" cx="110" cy="250" r="7" />
           <path className="m-flow-sig" d="M62,226 c6,-14 12,-14 10,0 s-6,16 4,4 s8,-14 12,-6 s2,8 8,0 s6,-6 10,-2" />
           <text className="m-flow-lbl static" x="110" y="282" textAnchor="middle">
-            A VALID SIGNATURE
+            A PAYMENT
           </text>
         </svg>
         <div className="m-hero-foot">
@@ -387,17 +352,17 @@ function Statement() {
   return (
     <section className="m-state">
       <div data-r>
-        <span className="mono dim">(000) palmfi — protected USDC vaults on Arc</span>
+        <span className="mono dim">Protected USDC treasury for teams</span>
         <h1 className="m-h1 serif">
-          <Words text="Your keys can be stolen." />
+          <Words text="The treasury account" />
           <em>
-            <Words text="Your treasury can't leave" base={0.25} />
+            <Words text="that moves fast" base={0.25} />
           </em>{" "}
-          <Words text="faster than your team can say no." base={0.5} />
+          <Words text="and never moves alone." base={0.5} />
         </h1>
       </div>
       <div className="m-state-row" data-r style={{ "--d": "0.5s" } as CSSProperties}>
-        <p>Every organisation gets its own USDC vault and Protected token. Small payments go out instantly within a budget. Anything larger waits as long as it is unusual, and a majority of your own wallets can veto it.</p>
+        <p>palmfi gives your team a USDC vault with built-in spending rules. Pay vendors, payroll and partners instantly within your budget. Bigger or unusual payouts pause for a quick team review, so every dollar leaves on your terms.</p>
         <div className="m-ctas">
           <Link href="/onboard" className="m-btn dark">
             <Mark /> Open a vault
@@ -435,16 +400,16 @@ function Facts() {
   return (
     <section className="m-facts">
       <div className="m-sec-head" data-r>
-        <span className="mono">(001) 29 October 2026</span>
+        <span className="mono">Why palmfi</span>
         <p className="m-lede">
-          Attackers never stole Binance&rsquo;s keys. They got its signing system to sign for them. The threat to design for is <em className="serif">&ldquo;the attacker can produce valid signatures.&rdquo;</em>
+          Speed for the payments you make every day, <em className="serif">a second look for the ones you don&rsquo;t</em>. palmfi learns how your team spends and handles the rest for you.
         </p>
       </div>
       <div className="m-facts-row">
         {[
-          { v: <Counter to={6.3} prefix="$" suffix="B" decimals={1} />, l: "left hot wallets in under an hour" },
-          { v: <Counter to={50} />, l: "pre-signed EIP-7702 authorizations in one transaction" },
-          { v: <Counter to={20} suffix=" min" />, l: "to swap $325M into ETH, ahead of any freeze" },
+          { v: <Counter to={15} suffix=" min" />, l: "typical review window for a payout above budget" },
+          { v: <Counter to={1} />, l: "tap from any teammate pauses everything" },
+          { v: <Counter to={7} suffix=" days" />, l: "notice before your recovery address can change" },
         ].map((f, i) => (
           <div key={i} className="m-fact" data-r style={{ "--d": `${i * 0.12}s` } as CSSProperties}>
             <i className="m-rule" />
@@ -465,12 +430,12 @@ function Sentence() {
   return (
     <section className="m-sentence" ref={ref}>
       <p className="m-sent-line">
-        <span>Wrapped assets</span>
+        <span>Your money,</span>
         <span className="m-clip">
           <Hills className="m-clip-fill" speed={3} />
           <i className="m-grain" />
         </span>
-        <span>with brakes.</span>
+        <span>your rules.</span>
       </p>
     </section>
   );
@@ -539,7 +504,7 @@ const DECK: {
     ink: "#2f6b3a",
     card: "Pay any address within your rolling 24h and 7d budget. Nothing waits.",
     title: "Small spending, no one in the way.",
-    body: "Everyday unwraps and pay-by-name payments go straight out, charged to one Instant budget that refills gradually over 24 hours and 7 days.",
+    body: "Everyday payments and pay-by-name transfers go straight out. Your Instant budget refills on its own over 24 hours and 7 days.",
     meta: "rolling 24h · 7d budget",
   },
   {
@@ -548,10 +513,10 @@ const DECK: {
     bg: "#e9d95c",
     fg: "#1f2a1e",
     ink: "#1f2a1e",
-    card: "Above budget, a payment waits. The more unusual it is, the longer it waits.",
-    title: "Unusual payouts wait longer.",
-    body: "The Sentinel scores each queued request in bits of surprise against that wallet's and that vault's own history. The delay doubles every 2.5 bits from a 15-minute floor, so routine payroll waits about half an hour.",
-    meta: "floor 15 min · 72h until scored",
+    card: "Above budget, a payment gets a short review. Routine ones clear fast.",
+    title: "A second look, only when it matters.",
+    body: "palmfi compares each payment with how your team usually spends. Familiar ones like payroll clear in about half an hour; anything out of pattern gets more time for review.",
+    meta: "from 15 min · learns your patterns",
   },
   {
     k: "Your team",
@@ -559,9 +524,9 @@ const DECK: {
     bg: "#1d3a2a",
     fg: "#e8f2c8",
     ink: "#cfe86a",
-    card: "While it waits, a majority of your own wallets can veto it or fast-track it.",
-    title: "Your team can say no.",
-    body: "More than half of the other wallets voting NO cancels the request. More than half of all wallets voting YES makes it executable at the floor. Every Voter gets a Telegram alert, so honest wallets are there to vote.",
+    card: "Your teammates get a Telegram ping and can approve or decline in one tap.",
+    title: "Your team, in the loop.",
+    body: "Every teammate gets a Telegram alert for payments under review. A majority YES sends it right away; a majority NO cancels it. One person, one vote.",
     meta: "3+ wallets · one vote each",
   },
   {
@@ -570,9 +535,9 @@ const DECK: {
     bg: "#8dbd6b",
     fg: "#fbfdf3",
     ink: "#fbfdf3",
-    card: "Any one wallet can freeze the vault. Frozen funds can only go to the recovery vault.",
-    title: "Rescue goes to one place, set in advance.",
-    body: "A frozen vault stops every outflow except migration to the recovery vault fixed at onboarding. Changing that address takes seven days, so no one can redirect funds mid-incident.",
+    card: "Any teammate can pause the vault. Paused funds only ever go to your recovery vault.",
+    title: "A safe harbour, chosen up front.",
+    body: "Pick a recovery vault when you set up. If anything ever looks off, one tap pauses payments and funds can only move there. Changing it takes seven days' notice.",
     meta: "recovery change · 7-day timelock",
   },
 ];
@@ -601,7 +566,7 @@ function Deck() {
     <section className="m-deck-sec" id="lanes" ref={ref}>
       <div className="m-deck-pin">
         <div className="m-deck-head">
-          <span className="mono">(002) How a vault spends</span>
+          <span className="mono">How a vault spends</span>
           <span className="mono dim tabular">
             0{i + 1} / 0{N}
           </span>
@@ -684,7 +649,7 @@ function Try() {
   return (
     <section className="m-try" id="try">
       <div className="m-sec-head" data-r>
-        <span className="mono">(003) Try a payout</span>
+        <span className="mono">Try a payout</span>
         <h2 className="m-h2 serif">
           <Words text="Drag the amount." /> <em><Words text="Watch the vault decide." base={0.2} /></em>
         </h2>
@@ -798,9 +763,9 @@ function Sentinel() {
         <div className="m-sent-card">
           <GlyphArt g="ladder" />
           <div className="m-sent-caption">
-            <span className="mono">(004) Sentinel</span>
-            <h2 className="serif">Every request, scored before it leaves.</h2>
-            <p>One shared Chainlink CRE workflow scores every outflow against that wallet&rsquo;s and that vault&rsquo;s own history, with pure integer math. The more surprising a request, the longer it waits. Past the threshold it flags: the vault freezes and the destination lands on the shared blocklist.</p>
+            <span className="mono">Smart review</span>
+            <h2 className="serif">Knows your normal. Flags the rest.</h2>
+            <p>palmfi&rsquo;s Sentinel, powered by Chainlink, checks every payout against your team&rsquo;s own history. Familiar payments glide through. Anything far out of pattern pauses the vault automatically, and the destination is blocked across the whole palmfi network.</p>
           </div>
           <i className="m-grain" />
         </div>
@@ -872,12 +837,12 @@ function Asymmetry() {
   return (
     <section className="m-asym" id="config">
       <div className="m-sec-head" data-r>
-        <span className="mono">(005) Config is asymmetric</span>
+        <span className="mono">Settings</span>
         <div>
           <h2 className="m-h2 serif">
             <Words text="Tighten in a click." /> <em><Words text="Loosen in days." base={0.2} /></em>
           </h2>
-          <p className="m-sec-p">Every settings change is a majority vote of your wallets. Tightening lands now; loosening waits out a timelock, and while it&rsquo;s pending, every payment looks more unusual to the Sentinel.</p>
+          <p className="m-sec-p">Settings are a team decision. Making your vault safer takes effect immediately; relaxing a rule gives everyone a few days&rsquo; notice first.</p>
         </div>
       </div>
       <div className="m-asym-grid">
@@ -970,20 +935,20 @@ function Network() {
   return (
     <section className="m-net" id="network">
       <span className="mono m-net-k" data-r>
-        (006) Paying other orgs
+        Paying other orgs
       </span>
       <Orbit />
       <p className="m-net-q serif" data-r>
-        <Words text="Orgs pay each other by name through one Orbital pool." />{" "}
+        <Words text="Pay any team on palmfi by name." />{" "}
         <em>
-          <Words text="You pay in your token, they receive theirs, and it counts against your budget." base={0.35} />
+          <Words text="No addresses to copy, and every transfer follows your rules." base={0.35} />
         </em>
       </p>
       <div className="m-net-stats">
         {[
-          { v: <Counter to={15} suffix=" min" />, l: "the floor: shortest wait for any queued payment" },
-          { v: <Counter to={72} suffix="h" />, l: "default delay until the Sentinel scores a request" },
-          { v: <Counter to={100} suffix="%" />, l: "USDC reserves behind every Protected token" },
+          { v: <Counter to={15} suffix=" min" />, l: "fastest review for a payment above budget" },
+          { v: <Counter to={72} suffix="h" />, l: "maximum hold while a payment is reviewed" },
+          { v: <Counter to={100} suffix="%" />, l: "backed 1:1 by USDC, always redeemable" },
         ].map((s, i) => (
           <div key={i} data-r style={{ "--d": `${i * 0.1}s` } as CSSProperties}>
             <i className="m-rule" />
@@ -1012,9 +977,9 @@ function Pieces() {
   return (
     <section className="m-pieces" id="pieces">
       <div className="m-sec-head" data-r>
-        <span className="mono">(007) Protocol</span>
+        <span className="mono">Under the hood</span>
         <h2 className="m-h2 serif">
-          <Words text="Six pieces." /> <em><Words text="Your team holds every rule." base={0.15} /></em>
+          <Words text="Simple on the surface." /> <em><Words text="Serious underneath." base={0.15} /></em>
         </h2>
       </div>
       <div className="m-pieces-list">
@@ -1066,7 +1031,7 @@ function Footer() {
             <Mark />
             <span>palmfi</span>
           </Link>
-          <p>Protected USDC vaults on Arc. Built at ETHGlobal Mumbai, November 2026.</p>
+          <p>Protected USDC vaults for teams. Instant everyday payments, brakes on everything else.</p>
         </div>
         <div className="m-foot-cols">
           <div>
@@ -1102,11 +1067,24 @@ function Footer() {
 
 /* ───────────────────────── page ───────────────────────── */
 
+/** Top-right CTA: straight to the dashboard when the connected wallet already has a vault. */
+function TopCta() {
+  const { address } = useAccount();
+  const my = useMyVaults(address);
+  const only = my.mine[0];
+  const href = my.mine.length === 1 ? `/vault/${only.name ?? only.vault}` : my.mine.length > 1 ? "/vaults" : "/onboard";
+  return (
+    <Link href={href} className="m-pill m-cta-fixed">
+      {my.mine.length ? "Open dashboard" : "Open a vault"}
+    </Link>
+  );
+}
+
 export function Meadow() {
   useReveals();
   return (
     <div className="meadow">
-      <Nav />
+      <TopCta />
       <main>
         <Hero />
         <Statement />

@@ -23,6 +23,8 @@ interface IOrbitalVault {
     function chargeOutflow(address wallet, uint256 amount) external;
     function settleOut(uint256 amount, address toVault) external;
     function settleIn(uint256 amount) external;
+    function wallets() external view returns (address[] memory);
+    function repayLifeline(uint256 principal, uint256 fee, address payeeVault) external;
 }
 
 interface IERC20Min {
@@ -44,6 +46,11 @@ interface IERC20Min {
 /// Foreign inventory the pool accumulates is settled Vault-to-Vault (`settle`): the issuer burns its tokens
 /// here and sends their USDC to the under-supplied Vault, which mints its own token back in. A Frozen issuer
 /// halts its settlement.
+///
+/// Lifeline (ADR-0013): a Frozen Vault whose Recovery key and wallet majority approve it can keep paying a payee
+/// Vault it already paid before the freeze. The pool fronts the payee's own token from the payee's float; the debt
+/// is repaid in USDC from the frozen reserves (which never move while frozen) on the first `settle` after the
+/// freeze resolves, and the payee earns a fee for the float it lent.
 contract OrbitalHook is BaseHook, IUnlockCallback {
     
     /// Liquidity concentration around the peg (virtual reserves = C × real at balance): keeps unevenly funded
@@ -80,11 +87,28 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
 
     bool transient _initializing;
 
+    /// Lifeline: outstanding fronted principal per payee token is at most this share of its own liquidity.
+    uint256 public constant LIFELINE_POOL_BPS = 5_000;
+
+    struct Debt {
+        address from; // frozen payer token
+        address to; // payee token whose float fronted it
+        uint128 principal;
+        uint128 fee;
+    }
+
+    /// Open Lifeline debts, repaid (and removed) by `settle`.
+    Debt[] public debts;
+    /// Fronted principal outstanding, per payee token.
+    mapping(address => uint256) public owedTo;
+
     event TokenRegistered(address indexed token, address indexed vault, uint256 index);
     event LiquidityAdded(address indexed token, address indexed wallet, uint256 amount);
     event LiquidityRemoved(address indexed token, address indexed wallet, uint256 amount);
     event OrbitalSwap(address indexed tokenIn, address indexed tokenOut, address payer, uint256 amountIn, uint256 amountOut);
     event Settled(address indexed fromToken, address indexed toToken, uint256 amount);
+    event LifelineFronted(address indexed fromToken, address indexed toToken, address recipient, uint256 amount, uint256 fee);
+    event LifelineRepaid(address indexed fromToken, address indexed toToken, uint256 amount, uint256 fee);
 
     error OnlyFactory();
     error OnlyAdmin();
@@ -100,6 +124,7 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     error LiquidityNotAllowed();
     error BadTick();
     error TickExhausted();
+    error NotFrozen();
 
     constructor(IPoolManager pm, address factory_, address admin_) BaseHook(pm) {
         factory = factory_;
@@ -172,6 +197,7 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
     uint8 internal constant ADD = 0;
     uint8 internal constant REMOVE = 1;
     uint8 internal constant SETTLE = 2;
+    uint8 internal constant FRONT = 3;
 
     /// An org adds its own token from one of its wallets (value stays its own: no outflow), in the default tick.
     function addLiquidity(address token, uint256 amount) external {
@@ -231,6 +257,56 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
         if (moved > 0) _resize(false);
     }
 
+    // ------------------------------------------------------------------
+    // Lifeline (ADR-0013)
+    // ------------------------------------------------------------------
+
+    /// Called by a Frozen Vault (after its Recovery key and wallet majority approved, and it checked the payee is
+    /// a known counterparty): pay `amount` of the payee's own token to the payee's wallet from the pool, owed back
+    /// in USDC once the payer's freeze resolves.
+    function lifelineDraw(address payeeVault, uint256 amount, uint256 fee) external {
+        address from = IOrbitalVault(msg.sender).token();
+        if (_index[from] == 0 || vaultOf[from] != msg.sender) revert UnknownToken();
+        if (!IOrbitalVault(msg.sender).isFrozen() || IOrbitalVault(msg.sender).canSettleOut()) revert NotFrozen();
+        address to = IOrbitalVault(payeeVault).token();
+        if (_index[to] == 0 || vaultOf[to] != payeeVault) revert UnknownToken();
+        if (IOrbitalVault(payeeVault).isFrozen()) revert FrozenToken(to);
+        if ((owedTo[to] + amount) * 10_000 > liquidityOf[to] * LIFELINE_POOL_BPS) revert InsufficientLiquidity();
+        if (amount > reserveOf[to]) revert InsufficientReserve();
+        address recipient = IOrbitalVault(payeeVault).wallets()[0];
+        poolManager.unlock(abi.encode(FRONT, to, amount, recipient));
+        reserveOf[to] -= amount;
+        owedTo[to] += amount;
+        debts.push(Debt(from, to, uint128(amount), uint128(fee)));
+        _resize(false);
+        emit LifelineFronted(from, to, recipient, amount, fee);
+    }
+
+    function debtCount() external view returns (uint256) {
+        return debts.length;
+    }
+
+    /// Repay every Lifeline whose payer can settle again (unfrozen, or migrated with the debt kept back) into a
+    /// payee that isn't frozen: USDC payer Vault → payee Vault, which mints the principal back into the pool.
+    function _repay() internal returns (uint256 moved) {
+        for (uint256 i = debts.length; i > 0; i--) {
+            Debt memory d = debts[i - 1];
+            (address vf, address vt) = (vaultOf[d.from], vaultOf[d.to]);
+            if (!IOrbitalVault(vf).canSettleOut() || IOrbitalVault(vt).isFrozen()) continue;
+            IOrbitalVault(vf).repayLifeline(d.principal, d.fee, vt);
+            poolManager.sync(Currency.wrap(d.to));
+            IOrbitalVault(vt).settleIn(d.principal);
+            poolManager.settle();
+            poolManager.mint(address(this), Currency.wrap(d.to).toId(), d.principal);
+            reserveOf[d.to] += d.principal;
+            owedTo[d.to] -= d.principal;
+            moved += d.principal;
+            debts[i - 1] = debts[debts.length - 1];
+            debts.pop();
+            emit LifelineRepaid(d.from, d.to, d.principal, d.fee);
+        }
+    }
+
     function unlockCallback(bytes calldata data) external onlyPoolManager returns (bytes memory) {
         (uint8 op, address token, uint256 amount, address who) = abi.decode(data, (uint8, address, uint256, address));
         Currency c = Currency.wrap(token);
@@ -245,8 +321,12 @@ contract OrbitalHook is BaseHook, IUnlockCallback {
             reserveOf[token] -= amount;
             poolManager.burn(address(this), c.toId(), amount);
             poolManager.take(c, who, amount);
+        } else if (op == FRONT) {
+            poolManager.burn(address(this), c.toId(), amount);
+            poolManager.take(c, who, amount);
         } else {
-            return abi.encode(_settle());
+            uint256 repaid = _repay();
+            return abi.encode(repaid + _settle());
         }
         return "";
     }

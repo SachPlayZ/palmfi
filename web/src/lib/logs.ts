@@ -6,7 +6,8 @@ import { usePublicClient } from "wagmi";
 import { arcTestnet } from "./network";
 import { deployments } from "./deployments";
 
-const STEP = 40_000n;
+/** The public Arc endpoint rejects eth_getLogs ranges above 10k blocks. */
+const STEP = 10_000n;
 
 /** Chunked getLogs from the deployment block (public RPCs cap ranges). Newest first. */
 export function useEventLogs<E extends AbiEvent>(

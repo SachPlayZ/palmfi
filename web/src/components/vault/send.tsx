@@ -1,5 +1,6 @@
 "use client";
 
+import { AmountChips } from "@/components/amount-chips";
 import { useState } from "react";
 import { vaultAbi } from "@/abi";
 import { BOND, formatUsd } from "@/lib/palm";
@@ -13,10 +14,10 @@ import { eq, fmtAmount, outflowsOpen, safeParse, statusLabel, useDestination, us
  * a quiet one within the budget clears at zero delay (no bond), anything else waits. CRE down: the direct
  * instant lane within the budget, as before.
  */
-export function SendCard({ v }: { v: VaultView }) {
+export function SendCard({ v, initialTo = "", initialAmount = "" }: { v: VaultView; initialTo?: string; initialAmount?: string }) {
   const roles = useRoles(v);
-  const [amount, setAmount] = useState("");
-  const [dest, setDest] = useState("");
+  const [amount, setAmount] = useState(initialAmount);
+  const [dest, setDest] = useState(initialTo);
   const tx = useTx();
   const s = v.s!;
   const amt = safeParse(amount);
@@ -36,7 +37,7 @@ export function SendCard({ v }: { v: VaultView }) {
   }
 
   return (
-    <Card title="Send">
+    <Card label="Send" title="Unwrap or pay a vault">
       {!open ? (
         <Notice tone="red">Outflows are stopped while this Vault is {statusLabel(v)}.</Notice>
       ) : (
@@ -46,6 +47,7 @@ export function SendCard({ v }: { v: VaultView }) {
         <Field label="Amount (USDC)" hint={`This wallet holds ${fmtAmount(myBal)} ${v.symbol}`}>
           <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0" />
         </Field>
+        <AmountChips value={amount} onChange={setAmount} max={roles.isWallet ? myBal : undefined} />
         <Field
           label="Destination"
           hint={

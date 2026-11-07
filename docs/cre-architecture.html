@@ -1,0 +1,473 @@
+<title>palmfi on Chainlink CRE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one long technical briefing, a single 980px column; diagrams scroll sideways inside their own frames. */
+:root{
+  --bg:#f5f7fb; --panel:#ffffff; --ink:#121a2e; --muted:#58627a; --line:#cfd6e4;
+  --accent:#2a5ada; --accent-soft:#e3eafc; --cre:#0e7c86; --cre-soft:#dff3f4;
+  --warn:#b25e00; --warn-soft:#fdf0de; --bad:#b4233a; --bad-soft:#fbe4e8; --good:#2f7d3a;
+  --display:"Schibsted Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --body:"Schibsted Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1220; --panel:#131b2d; --ink:#e6ebf5; --muted:#97a2ba; --line:#2a3550;
+  --accent:#7d9dff; --accent-soft:#1c2a4f; --cre:#4cc9d3; --cre-soft:#0f3236;
+  --warn:#f0a548; --warn-soft:#3a2810; --bad:#ff7088; --bad-soft:#3d1520; --good:#6fcf7c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1220; --panel:#131b2d; --ink:#e6ebf5; --muted:#97a2ba; --line:#2a3550;
+  --accent:#7d9dff; --accent-soft:#1c2a4f; --cre:#4cc9d3; --cre-soft:#0f3236;
+  --warn:#f0a548; --warn-soft:#3a2810; --bad:#ff7088; --bad-soft:#3d1520; --good:#6fcf7c; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:980px;margin:0 auto;padding-block:48px 80px;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.6rem;font-weight:700;letter-spacing:-.01em}
+h3{font-size:1.1rem;font-weight:700}
+p{margin:0;max-width:68ch}
+section{display:flex;flex-direction:column;gap:18px}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cre)}
+.lede{font-size:1.15rem;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+.frame{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto;padding:16px}
+.frame svg{display:block;min-width:900px;width:100%;height:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card p{font-size:.95rem;color:var(--muted)}
+.tag{font-family:var(--mono);font-size:.72rem;color:var(--cre);letter-spacing:.06em;text-transform:uppercase}
+.tbl{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:.92rem;min-width:640px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap}
+.pill{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.p-good{background:var(--cre-soft);color:var(--cre)} .p-warn{background:var(--warn-soft);color:var(--warn)} .p-bad{background:var(--bad-soft);color:var(--bad)} .p-acc{background:var(--accent-soft);color:var(--accent)}
+.formula{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cre);border-radius:6px;padding:14px 18px;font-size:.92rem;line-height:1.8;overflow-x:auto;white-space:pre}
+ul{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+.legend{display:flex;flex-wrap:wrap;gap:16px;font-size:.85rem;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:22px;height:0;border-top:2px solid var(--c);margin-right:6px;vertical-align:middle}
+/* SVG styling from tokens */
+.zone{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.zone-cre{fill:var(--cre-soft);fill-opacity:.35;stroke:var(--cre);stroke-width:1.5}
+.box{fill:var(--panel);stroke:var(--line);stroke-width:1.2}
+.box-cre{fill:var(--panel);stroke:var(--cre);stroke-width:1.4}
+.box-acc{fill:var(--panel);stroke:var(--accent);stroke-width:1.4}
+.box-bad{fill:var(--panel);stroke:var(--bad);stroke-width:1.4}
+.t-h{font:700 14px var(--display);fill:var(--ink)}
+.t-z{font:600 11px var(--mono);fill:var(--muted);letter-spacing:.1em}
+.t-b{font:400 11.5px var(--mono);fill:var(--muted)}
+.t-l{font:500 11px var(--mono);fill:var(--ink)}
+.t-n{font:700 11px var(--mono);fill:var(--panel)}
+.a{fill:none;stroke-width:1.6}
+.a-ev{stroke:var(--accent)} .a-rd{stroke:var(--muted);stroke-dasharray:4 4} .a-wr{stroke:var(--cre)} .a-ht{stroke:var(--warn)} .a-v{stroke:var(--good);stroke-dasharray:6 4}
+.lbl-bg{fill:var(--bg)}
+.dot{fill:var(--accent)}
+.ax{stroke:var(--line);stroke-width:1} .ax-t{font:400 11px var(--mono);fill:var(--muted)}
+.curve{fill:none;stroke:var(--cre);stroke-width:2.5}
+@media (prefers-reduced-motion:no-preference){.flow{animation:dash 1.2s linear infinite}@keyframes dash{to{stroke-dashoffset:-16}}}
+</style>
+
+<main>
+<header style="display:flex;flex-direction:column;gap:16px">
+  <div class="eyebrow">palmfi · ETHGlobal Mumbai · architecture brief for Chainlink</div>
+  <h1>How palmfi uses Chainlink CRE as the risk engine for treasury vaults</h1>
+  <p class="lede">Assume an attacker can produce valid signatures. palmfi's Vault limits what any valid signature can move right now. Anything above the Instant budget waits, and CRE decides how long: two shared workflows score every request against that Vault's own onchain history and write a signed delay or a FLAG back through the Keystone forwarder.</p>
+</header>
+
+<section>
+  <div class="eyebrow">01 · Why CRE</div>
+  <h2>What we need from an offchain executor, and why CRE fits</h2>
+  <div class="grid">
+    <div class="card"><span class="tag">No single trusted key</span><h3>A decentralized verdict</h3><p>If the risk engine were our own server, stealing its key would be the new single point of failure. A DON reaches consensus on each report and the forwarder checks the signatures before the Hub sees it.</p></div>
+    <div class="card"><span class="tag">Reacts to events</span><h3>Log triggers on the Hub</h3><p>Every Vault emits through one Hub, so one log trigger catches every <code>RequestQueued</code>, <code>ConfigChange</code> and pool <code>Outflow</code> across all orgs within a block.</p></div>
+    <div class="card"><span class="tag">Catches what was missed</span><h3>Cron for liveness</h3><p>A scheduled Reconciler scores anything the Sentinel missed, checks reserves and EIP-7702 delegations, and writes a heartbeat the Hub uses to know CRE is alive.</p></div>
+    <div class="card"><span class="tag">Too heavy for gas</span><h3>Compute offchain, enforce onchain</h3><p>The surprise model reads the last 32 outflows, destination counts, hours and wallet ages, then runs log/exp fixed-point math. CRE computes; the Vault only clamps and applies.</p></div>
+    <div class="card"><span class="tag">Private alerts</span><h3>Confidential HTTP</h3><p>Voters get a Telegram alert on long delays and FLAGs. The API key lives in Vault DON secrets and is injected inside the enclave, so workflow code never sees it.</p></div>
+    <div class="card"><span class="tag">Fits the 3-workflow limit</span><h3>Two shared workflows</h3><p>CRE allows 3 workflows per organisation, so we can't run one per Vault. Two shared workflows serve every Vault; each request is still scored against its own Vault's profile (ADR-0003).</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">02 · System architecture</div>
+  <h2>Components and data paths</h2>
+  <p>Numbers follow one queued payment from request to verdict. Blue is an event, grey dashed is a read, teal is a signed write, amber is the heartbeat, green is the human response.</p>
+  <div class="legend">
+    <span style="--c:var(--accent)">event / trigger</span><span style="--c:var(--muted)">EVM read</span><span style="--c:var(--cre)">signed report write</span><span style="--c:var(--warn)">heartbeat</span><span style="--c:var(--good)">voters respond</span>
+  </div>
+  <div class="frame">
+  <svg viewBox="0 0 1100 760" role="img" aria-label="palmfi CRE architecture diagram">
+    <defs>
+      <marker id="m-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+      <marker id="m-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted)"/></marker>
+      <marker id="m-cre" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--cre)"/></marker>
+      <marker id="m-wrn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--warn)"/></marker>
+      <marker id="m-gd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--good)"/></marker>
+    </defs>
+
+    <!-- zones -->
+    <rect class="zone" x="20" y="20" width="330" height="690" rx="12"/>
+    <text class="t-z" x="36" y="44">ARC TESTNET · CHAIN 5042002 · BFT FINALITY</text>
+    <rect class="zone-cre" x="400" y="20" width="370" height="690" rx="12"/>
+    <text class="t-z" x="416" y="44" style="fill:var(--cre)">CHAINLINK CRE · WORKFLOW DON</text>
+    <rect class="zone" x="820" y="20" width="260" height="690" rx="12"/>
+    <text class="t-z" x="836" y="44">OFFCHAIN · palmfi WEB</text>
+
+    <!-- Arc column -->
+    <rect class="box-acc" x="45" y="65" width="280" height="70" rx="8"/>
+    <text class="t-h" x="60" y="88">Org Voters</text>
+    <text class="t-b" x="60" y="106">3+ hot wallets, one vote each</text>
+    <text class="t-b" x="60" y="122">request · vote · freeze</text>
+
+    <rect class="box" x="45" y="190" width="280" height="160" rx="8"/>
+    <text class="t-h" x="60" y="213">Vault (one per org)</text>
+    <text class="t-b" x="60" y="233">requestUnwrap / requestPayment</text>
+    <text class="t-b" x="60" y="249">requestSwap (Orbital pool)</text>
+    <text class="t-b" x="60" y="265">scoringContext(id)  ← CRE reads</text>
+    <text class="t-b" x="60" y="281">applyDelay / applyFlag</text>
+    <text class="t-b" x="60" y="297">clamp delay to [Floor, MaxDelay]</text>
+    <text class="t-b" x="60" y="313">≥ CapDelay above Hard cap</text>
+    <text class="t-b" x="60" y="329">delay 0 only within Instant budget</text>
+
+    <rect class="box" x="45" y="400" width="280" height="160" rx="8"/>
+    <text class="t-h" x="60" y="423">Hub (single network contract)</text>
+    <text class="t-b" x="60" y="443">emits RequestQueued · ConfigChange</text>
+    <text class="t-b" x="60" y="459">      · Outflow(viaPool)</text>
+    <text class="t-b" x="60" y="475">onReport(metadata, report)</text>
+    <text class="t-b" x="60" y="491">never reverts on content → Rejected</text>
+    <text class="t-b" x="60" y="507">creLive(): heartbeat ≤ 10 min</text>
+    <text class="t-b" x="60" y="523">statusOf · blocklist · openRequests</text>
+    <text class="t-b" x="60" y="539">pinWorkflow(id, owner, name)</text>
+
+    <rect class="box-cre" x="45" y="610" width="280" height="80" rx="8"/>
+    <text class="t-h" x="60" y="633">Keystone forwarder</text>
+    <text class="t-b" x="60" y="653">verifies DON signatures (f+1)</text>
+    <text class="t-b" x="60" y="669">marks report used only if</text>
+    <text class="t-b" x="60" y="685">receiver call succeeds</text>
+
+    <!-- CRE column -->
+    <rect class="box-cre" x="420" y="65" width="160" height="62" rx="8"/>
+    <text class="t-h" x="434" y="88">EVM log trigger</text>
+    <text class="t-b" x="434" y="106">address: Hub</text>
+    <text class="t-b" x="434" y="120">CONFIDENCE_LATEST</text>
+    <rect class="box-cre" x="595" y="65" width="160" height="62" rx="8"/>
+    <text class="t-h" x="609" y="88">Cron trigger</text>
+    <text class="t-b" x="609" y="106">"0 */1 * * * *"</text>
+    <text class="t-b" x="609" y="120">every minute</text>
+
+    <rect class="box-cre" x="420" y="160" width="160" height="130" rx="8"/>
+    <text class="t-h" x="434" y="183">Sentinel</text>
+    <text class="t-b" x="434" y="203">RequestQueued →</text>
+    <text class="t-b" x="434" y="217">  score → SET_DELAY|FLAG</text>
+    <text class="t-b" x="434" y="235">ConfigChange →</text>
+    <text class="t-b" x="434" y="249">  notify, re-score open</text>
+    <text class="t-b" x="434" y="267">Outflow(pool) →</text>
+    <text class="t-b" x="434" y="281">  reserve/7702 check</text>
+    <rect class="box-cre" x="595" y="160" width="160" height="130" rx="8"/>
+    <text class="t-h" x="609" y="183">Reconciler</text>
+    <text class="t-b" x="609" y="203">1 health page:</text>
+    <text class="t-b" x="609" y="217">  reserves, 7702</text>
+    <text class="t-b" x="609" y="235">2 unscored requests,</text>
+    <text class="t-b" x="609" y="249">  largest first</text>
+    <text class="t-b" x="609" y="267">3 heartbeat</text>
+    <text class="t-b" x="609" y="281">  (slot reserved)</text>
+
+    <rect class="box" x="420" y="320" width="335" height="150" rx="8"/>
+    <text class="t-h" x="434" y="343">shared/ (one codebase, both workflows)</text>
+    <text class="t-b" x="434" y="365">deviation.ts  pure bigint model, milli-bits</text>
+    <text class="t-b" x="434" y="383">scoring.ts    read → assess → write → notify</text>
+    <text class="t-b" x="434" y="401">health.ts     RESERVE_FLAG · DELEGATION_FLAG</text>
+    <text class="t-b" x="434" y="419">report.ts     abi.encode(Report), nonce</text>
+    <text class="t-b" x="434" y="437">notify.ts     Confidential HTTP call</text>
+    <text class="t-b" x="434" y="455">chain.ts      Multicall3 batching</text>
+
+    <rect class="box-cre" x="420" y="500" width="160" height="80" rx="8"/>
+    <text class="t-h" x="434" y="523">EVM read</text>
+    <text class="t-b" x="434" y="541">1 Multicall3 / run</text>
+    <text class="t-b" x="434" y="557">block header ts</text>
+    <text class="t-b" x="434" y="571">(never node clock)</text>
+    <rect class="box-cre" x="595" y="500" width="160" height="80" rx="8"/>
+    <text class="t-h" x="609" y="523">Report + write</text>
+    <text class="t-b" x="609" y="541">consensus, ecdsa,</text>
+    <text class="t-b" x="609" y="557">keccak256 → writeReport</text>
+    <text class="t-b" x="609" y="571">≤ 5 writes / run</text>
+
+    <rect class="box-cre" x="420" y="610" width="335" height="80" rx="8"/>
+    <text class="t-h" x="434" y="633">Confidential HTTP + Vault DON secrets</text>
+    <text class="t-b" x="434" y="653">secret notifyApiKey → header x-api-key</text>
+    <text class="t-b" x="434" y="669">injected as {{.notifyApiKey}} in enclave</text>
+    <text class="t-b" x="434" y="685">failure never undoes a written report</text>
+
+    <!-- Offchain column -->
+    <rect class="box" x="840" y="65" width="220" height="110" rx="8"/>
+    <text class="t-h" x="854" y="88">Dashboard / votes UI</text>
+    <text class="t-b" x="854" y="108">reads state, not tx status</text>
+    <text class="t-b" x="854" y="124">per-term score breakdown</text>
+    <text class="t-b" x="854" y="140">same model, drift-tested</text>
+    <text class="t-b" x="854" y="156">against the Sentinel</text>
+
+    <rect class="box" x="840" y="520" width="220" height="80" rx="8"/>
+    <text class="t-h" x="854" y="543">POST /api/notify</text>
+    <text class="t-b" x="854" y="563">idempotent (CRE may retry)</text>
+    <text class="t-b" x="854" y="579">fans out to Vault.wallets()</text>
+    <rect class="box" x="840" y="625" width="220" height="65" rx="8"/>
+    <text class="t-h" x="854" y="648">Telegram</text>
+    <text class="t-b" x="854" y="668">every Voter, not just requester</text>
+
+    <!-- arrows -->
+    <path class="a a-ev" d="M150 135 V188" marker-end="url(#m-acc)"/>
+    <path class="a a-ev" d="M150 350 V398" marker-end="url(#m-acc)"/>
+    <path class="a a-ev flow" d="M325 440 H372 V96 H418" marker-end="url(#m-acc)" stroke-dasharray="8 8"/>
+    <path class="a a-ev" d="M500 127 V158" marker-end="url(#m-acc)"/>
+    <path class="a a-ev" d="M675 127 V158" marker-end="url(#m-acc)"/>
+    <path class="a a-rd" d="M500 290 V318" marker-end="url(#m-mut)"/>
+    <path class="a a-rd" d="M675 290 V318" marker-end="url(#m-mut)"/>
+    <path class="a a-rd" d="M500 470 V498" marker-end="url(#m-mut)"/>
+    <path class="a a-wr" d="M675 470 V498" marker-end="url(#m-cre)"/>
+    <path class="a a-rd" d="M420 540 H386 V270 H327" marker-end="url(#m-mut)"/>
+    <path class="a a-wr" d="M675 580 V598 H360 V650 H327" marker-end="url(#m-cre)"/>
+    <path class="a a-wr" d="M150 610 V562" marker-end="url(#m-cre)"/>
+    <path class="a a-wr" d="M250 400 V352" marker-end="url(#m-cre)"/>
+    <path class="a a-ht" d="M755 225 H790 V740 H200 V692" marker-end="url(#m-wrn)"/>
+    <path class="a a-wr" d="M755 650 H800 V560 H838" marker-end="url(#m-cre)"/>
+    <path class="a a-wr" d="M950 600 V623" marker-end="url(#m-cre)"/>
+    <path class="a a-v" d="M1060 657 H1072 V30 H190 V63" marker-end="url(#m-gd)"/>
+
+    <!-- step badges -->
+    <g>
+      <circle class="dot" cx="165" cy="162" r="10"/><text class="t-n" x="161" y="166">1</text>
+      <circle class="dot" cx="165" cy="374" r="10"/><text class="t-n" x="161" y="378">2</text>
+      <circle class="dot" cx="372" cy="250" r="10"/><text class="t-n" x="368" y="254">3</text>
+      <circle class="dot" cx="386" cy="420" r="10" style="fill:var(--muted)"/><text class="t-n" x="382" y="424">4</text>
+      <circle class="dot" cx="690" cy="485" r="10" style="fill:var(--cre)"/><text class="t-n" x="686" y="489">5</text>
+      <circle class="dot" cx="360" cy="625" r="10" style="fill:var(--cre)"/><text class="t-n" x="356" y="629">6</text>
+      <circle class="dot" cx="165" cy="586" r="10" style="fill:var(--cre)"/><text class="t-n" x="161" y="590">7</text>
+      <circle class="dot" cx="265" cy="376" r="10" style="fill:var(--cre)"/><text class="t-n" x="261" y="380">8</text>
+      <circle class="dot" cx="800" cy="605" r="10" style="fill:var(--cre)"/><text class="t-n" x="796" y="609">9</text>
+      <circle class="dot" cx="1072" cy="340" r="10" style="fill:var(--good)"/><text class="t-n" x="1065" y="344">10</text>
+    </g>
+    <text class="t-l" x="505" y="740" style="fill:var(--warn)">HEARTBEAT report every pass → Hub.creLive()</text>
+  </svg>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Step</th><th>What happens</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>A Voter asks to pay or unwrap. Above the Instant budget it queues with a 1 USDC bond and defaults to <code>MaxDelay</code> (72h) until scored. While CRE is live, every outflow is a request, small ones too (ADR-0012).</td><td class="mono">Vault.requestPayment</td></tr>
+      <tr><td>2</td><td>The Vault reports through the Hub, which emits <code>RequestQueued(vault, requestId, requestHash)</code>.</td><td class="mono">Hub</td></tr>
+      <tr><td>3</td><td>The Sentinel's log trigger fires on the Hub address with all three event topics at <code>CONFIDENCE_LEVEL_LATEST</code>; Arc's BFT finality makes LATEST final.</td><td class="mono">sentinel/main.ts</td></tr>
+      <tr><td>4</td><td>One Multicall3 call reads <code>hub.statusOf</code> and <code>vault.scoringContext(id)</code>: the request, last 32 outflows, destination counts, profile, wallet age, delegation, pending config. The block header gives the timestamp.</td><td class="mono">scoring.ts · chain.ts</td></tr>
+      <tr><td>5</td><td>The pure integer model computes the score in milli-bits and the delay. Every node gets the same bytes, the DON agrees, and the report is ECDSA-signed over keccak256.</td><td class="mono">deviation.ts · report.ts</td></tr>
+      <tr><td>6–7</td><td><code>evm.writeReport</code> sends to the forwarder, which checks signatures and calls <code>Hub.onReport</code>. Success requires both tx success and a non-reverting receiver.</td><td class="mono">KeystoneForwarder</td></tr>
+      <tr><td>8</td><td>The Hub checks forwarder, workflow identity, duplicate, expiry and type, then calls <code>applyDelay</code> or <code>applyFlag</code>. FLAG freezes the Vault and, for a verified Vault, blocklists the destination network-wide.</td><td class="mono">Hub.onReport</td></tr>
+      <tr><td>9</td><td>On FLAG or a delay ≥ 6h, Confidential HTTP posts to <code>/api/notify</code>, which alerts every Voter so a hacked requester can't mute it.</td><td class="mono">notify.ts</td></tr>
+      <tr><td>10</td><td>During the delay, more than half of the other wallets voting NO vetoes; more than half of all wallets voting YES fast-tracks to the Floor.</td><td class="mono">Vault votes</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="eyebrow">03 · Request lifecycle</div>
+  <h2>Sequence: one payment, end to end</h2>
+  <div class="frame">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor W as Requesting wallet
+    participant V as Vault
+    participant H as Hub
+    participant S as CRE Sentinel (DON)
+    participant F as Keystone forwarder
+    participant N as /api/notify
+    actor O as Other Voters
+    W->>V: requestPayment(dest, amount) + 1 USDC bond
+    V->>H: report event
+    H-->>S: RequestQueued(vault, id, requestHash)
+    Note over V: default delay = MaxDelay (72h)
+    S->>V: multicall statusOf + scoringContext(id)
+    S->>S: assess(): S = amount + dest + time + velocity + flags
+    S->>S: consensus + ECDSA report (SET_DELAY or FLAG)
+    S->>F: writeReport(receiver = Hub)
+    F->>H: onReport(metadata, report)
+    alt SET_DELAY
+        H->>V: applyDelay(id, hash, delay, score, codes)
+        V->>V: clamp [Floor, MaxDelay], ≥ CapDelay over Hard cap
+    else FLAG
+        H->>V: applyFlag(id, hash, score, codes)
+        H->>H: freeze Vault, blocklist destination
+    end
+    S->>N: Confidential HTTP (FLAG or delay ≥ 6h)
+    N-->>O: Telegram alert with per-term reasons
+    alt majority of others vote NO
+        O->>V: veto → cancelled, bond kept
+    else majority of all vote YES
+        O->>V: fast-track → executable at Floor
+    else nobody objects
+        W->>V: execute after delay
+    end
+</pre>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">04 · The model CRE runs</div>
+  <h2>Deviation score: surprise in bits, mapped to time</h2>
+  <p>The Sentinel asks one question: how surprising is this request, given this wallet's and this Vault's own history? It answers in bits of surprisal, scored at both wallet and Vault scope, and keeps the higher one. Everything is integer fixed point (bigint, milli-bits, table-based <code>exp2</code>, repeated-squaring <code>log2</code>) and measured at the request's own <code>createdAt</code>, so a late re-score by the Reconciler gives the same answer and every DON node signs identical bytes.</p>
+  <div class="formula">S      = S_amount + S_dest + S_time + S_velocity + S_flags      (max of wallet and Vault scope)
+delay  = clamp( Floor · 2^(S / k), Floor, MaxDelay )          k = 2.5 bits per doubling
+quiet  : amount ≤ usualMaxPayout and S &lt; 2.5 bits  →  delay 0  (Vault honours it only within the Instant budget)
+FLAG   : S ≥ S_flag (28 bits prod, 18 testnet) or blocklisted destination  →  freeze + blocklist
+blind  : no baseline at all  →  MaxDelay       (unsure means slow)</div>
+  <div class="tbl"><table>
+    <thead><tr><th>Term</th><th>What it measures</th><th>Robustness detail</th><th>Reason code</th></tr></thead>
+    <tbody>
+      <tr><td>S_amount</td><td>Log-amount vs the Vault's executed history</td><td>Median / MAD baseline, MAD floor of ±√2×; zero up to the onboarding threshold; profile seeds it until 8 samples</td><td><span class="pill p-warn">UNUSUAL_AMOUNT</span></td></tr>
+      <tr><td>S_dest</td><td>−log₂ of a Laplace-smoothed destination frequency</td><td>Onboarding destinations get 8 pseudo-counts; all-time <code>destinationCount</code> vouches only at Vault scope</td><td><span class="pill p-warn">NEW_DESTINATION</span></td></tr>
+      <tr><td>S_time</td><td>Hour-of-day surprise</td><td>Business hours from the profile get 2 pseudo-counts each</td><td><span class="pill p-warn">OFF_HOURS</span></td></tr>
+      <tr><td>S_velocity</td><td>Poisson surprisal of the request rate</td><td>Rate measured over at least 7 days; catches bursts of small payments (smurfing)</td><td><span class="pill p-warn">VELOCITY</span></td></tr>
+      <tr><td>S_flags</td><td>Context flags</td><td>4 bits each for a pending config change (Sybil wallet add) and a wallet younger than 7 days</td><td><span class="pill p-acc">CONFIG_CHANGE_PENDING</span> <span class="pill p-acc">NEW_WALLET</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="frame">
+    <svg id="curve" viewBox="0 0 900 340" role="img" aria-label="Delay as a function of deviation score"></svg>
+  </div>
+  <p style="color:var(--muted);font-size:.92rem">Routine payroll scores about 3 bits and waits about 30 minutes. A $3M payment at 3am to a new address scores about 30 bits and is FLAGged. The baseline learns only from executed, un-vetoed outflows, with a per-day drift cap, so an attacker can't train it with vetoed requests.</p>
+</section>
+
+<section>
+  <div class="eyebrow">05 · Report format</div>
+  <h2>One report struct, five report types</h2>
+  <div class="formula">struct Report {                       // abi.encode, decoded by Hub.decodeReport
+  uint8   reportType;   address vault;      uint256 requestId;
+  bytes32 requestHash;  // binds the verdict to the exact request that was queued
+  uint64  delay;        uint32  score;      // seconds, milli-bits
+  uint256 reasonCodes;  // bitmask the UI renders as "+9 bits: new destination"
+  uint64  expiry;       // block timestamp + 900s TTL
+  uint256 nonce;        // keccak(txHash:logIndex | ref | action | score) or keccak(cron slot)
+}</div>
+  <div class="tbl"><table>
+    <thead><tr><th>Type</th><th>Written by</th><th>Onchain effect</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill p-good">SET_DELAY</span></td><td>Sentinel, Reconciler</td><td>Vault sets <code>executableAt</code>, clamped to its own bounds. Ignored if the request was fast-tracked.</td></tr>
+      <tr><td><span class="pill p-bad">FLAG</span></td><td>Sentinel, Reconciler</td><td>Vault frozen; destination blocklisted network-wide if the flagging Vault is verified. Written even over a fast-track.</td></tr>
+      <tr><td><span class="pill p-bad">RESERVE_FLAG</span></td><td>Reconciler, Sentinel on pool outflow</td><td>Freeze when USDC held is below Protected token supply.</td></tr>
+      <tr><td><span class="pill p-bad">DELEGATION_FLAG</span></td><td>Reconciler, Sentinel on pool outflow</td><td>Freeze when a wallet is EIP-7702-delegated to an unapproved target.</td></tr>
+      <tr><td><span class="pill p-warn">HEARTBEAT</span></td><td>Reconciler, every pass</td><td>Sets <code>lastHeartbeat</code>; <code>creLive()</code> is true for 10 minutes after.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="eyebrow">06 · Trust boundaries</div>
+  <h2>What CRE can and cannot do to a Vault</h2>
+  <p>We designed so that CRE adds safety without becoming a new way to lose funds. A fully compromised workflow can make things slower or freeze a Vault, but it can't release more than the Instant budget.</p>
+  <div class="grid">
+    <div class="card"><span class="tag">Compromised CRE</span><h3>Bounded by the Vault</h3><p>The Vault clamps every delay to [Floor, MaxDelay], enforces CapDelay over the Hard cap, and honours delay 0 only within the remaining budget, which it spends. A malicious verdict releases no more than the budget.</p></div>
+    <div class="card"><span class="tag">CRE silent</span><h3>Fails slow</h3><p>Unscored requests wait MaxDelay. When the heartbeat goes stale, <code>creLive()</code> turns false and the plain budget lane resumes, so silence never lets more money out than before.</p></div>
+    <div class="card"><span class="tag">Replay safety</span><h3>Hub never reverts on content</h3><p>The forwarder only marks a report used if <code>onReport</code> succeeds. So the Hub reverts only on a wrong caller and drops bad content as <code>ReportRejected(reason)</code>: expired, duplicate, hash mismatch, unknown vault, untrusted workflow (ADR-0005).</p></div>
+    <div class="card"><span class="tag">Identity</span><h3>Pinned workflow</h3><p><code>pinWorkflow</code> fixes the forwarder plus workflow id, owner and name from report metadata. The testnet Hub trusts the simulation forwarder so judges can run <code>cre workflow simulate --broadcast</code>.</p></div>
+    <div class="card"><span class="tag">Determinism</span><h3>Consensus-safe inputs</h3><p>No floats, no randomness, no node clock. Time comes from the block header; nonces come from trigger data; Reconciler ordering breaks ties by vault then id so every node sorts the same way.</p></div>
+    <div class="card"><span class="tag">Missing data</span><h3>Never freeze on a failed read</h3><p>A failed reserves or delegation read is treated as no evidence. Without a block header the Sentinel writes nothing and leaves the request for the Reconciler.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">07 · Request states</div>
+  <h2>How a verdict moves a request</h2>
+  <div class="frame">
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> Pending: requestPayment / requestUnwrap / requestSwap
+    Pending --> Pending: unscored, executableAt = createdAt + MaxDelay
+    Pending --> Scored: SET_DELAY report
+    Pending --> Flagged: FLAG report
+    Pending --> FastTracked: majority of all YES
+    Scored --> Scored: re-score on ConfigChange (wallet add)
+    Scored --> Vetoed: majority of others NO
+    Scored --> Executable: delay elapsed
+    FastTracked --> Executable: Floor elapsed
+    FastTracked --> Flagged: FLAG still applies
+    Executable --> Executed: execute()
+    Executed --> [*]: joins baseline history
+    Vetoed --> [*]
+    Flagged --> VaultFrozen: Hub freezes, blocklists destination
+    VaultFrozen --> [*]: majority or Recovery key unfreezes / migrates
+</pre>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">08 · Failure matrix</div>
+  <h2>Scenarios we simulate with the CRE CLI</h2>
+  <p>Each row is a fixture in <code>cre/fixtures/</code> with a matching unit test; enabled rows replay a real Arc transaction through <code>cre workflow simulate</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Scenario</th><th>Workflow</th><th>Expected outcome</th></tr></thead>
+    <tbody>
+      <tr><td>00</td><td>Baseline pass</td><td>Reconciler</td><td>Heartbeat written</td></tr>
+      <tr><td>01</td><td>CRE fully down (dead RPC)</td><td>Reconciler</td><td>Nothing written on missing data; requests keep MaxDelay</td></tr>
+      <tr><td>02</td><td>Missed log / dropped execution</td><td>Reconciler</td><td>Unscored request picked up, DELAY written</td></tr>
+      <tr><td>03</td><td>Replay of a closed request</td><td>Sentinel</td><td>Skipped, or rejected onchain by nonce / requestHash</td></tr>
+      <tr><td>04</td><td>Compromised CRE sets Floor</td><td>Onchain (Foundry)</td><td>Vault clamps; budget still caps release</td></tr>
+      <tr><td>05</td><td>Baseline poisoning with planted outliers</td><td>Sentinel</td><td>Large request still carries UNUSUAL_AMOUNT</td></tr>
+      <tr><td>06</td><td>Voter fatigue flood</td><td>Reconciler</td><td>Largest request scored first; pending cap and bond onchain</td></tr>
+      <tr><td>07</td><td>Sybil wallet add</td><td>Sentinel</td><td>Every open request re-scored with CONFIG_CHANGE_PENDING</td></tr>
+      <tr><td>08</td><td>Attacker freezes to grief</td><td>Sentinel</td><td>Later requests skipped as SKIP_VAULT_INACTIVE until unfreeze</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="eyebrow">09 · CRE surface we use</div>
+  <h2>Capabilities, by workflow</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Capability</th><th>Sentinel</th><th>Reconciler</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td>EVM log trigger</td><td>✓</td><td></td><td>Hub events at LATEST confidence</td></tr>
+      <tr><td>Cron trigger</td><td></td><td>✓</td><td>Pass every minute; nonce from scheduled slot</td></tr>
+      <tr><td>EVM read (callContract + Multicall3)</td><td>✓</td><td>✓</td><td>One batched read per run; block header timestamp</td></tr>
+      <tr><td>Report generation (ecdsa / keccak256)</td><td>✓</td><td>✓</td><td>Consensus-signed <code>Report</code></td></tr>
+      <tr><td>EVM writeReport</td><td>✓</td><td>✓</td><td>To Hub via forwarder; checks receiver execution status</td></tr>
+      <tr><td>Confidential HTTP</td><td>✓</td><td>✓</td><td>Voter alerts with secret header injection</td></tr>
+      <tr><td>Vault DON secrets</td><td>✓</td><td>✓</td><td><code>notifyApiKey</code>, declared in <code>secrets.yaml</code></td></tr>
+      <tr><td>TypeScript SDK + simulate CLI</td><td>✓</td><td>✓</td><td>Bun workspace; 124 tests; live simulation against Arc</td></tr>
+    </tbody>
+  </table></div>
+  <p style="color:var(--muted);font-size:.92rem">Source: <code>cre/sentinel/main.ts</code>, <code>cre/reconciler/main.ts</code>, <code>cre/shared/*</code>, <code>contracts/src/Hub.sol</code>, ADRs 0003, 0005, 0009, 0012.</p>
+</section>
+</main>
+
+<script>
+(function(){
+  const svg=document.getElementById('curve'); if(!svg) return;
+  const W=900,H=340,L=70,R=30,T=24,B=50, xMax=32;
+  const yMin=Math.log2(900), yMax=Math.log2(259200);
+  const x=s=>L+(s/xMax)*(W-L-R);
+  const y=sec=>T+(1-(Math.log2(sec)-yMin)/(yMax-yMin))*(H-T-B);
+  const ns='http://www.w3.org/2000/svg';
+  const el=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const k in a)e.setAttribute(k,a[k]);if(txt)e.textContent=txt;svg.appendChild(e);return e};
+  [[900,'15 min'],[3600,'1 h'],[21600,'6 h'],[86400,'24 h'],[259200,'72 h']].forEach(([s,l])=>{
+    el('line',{x1:L,x2:W-R,y1:y(s),y2:y(s),class:'ax','stroke-dasharray':'2 4'});
+    el('text',{x:L-8,y:y(s)+4,'text-anchor':'end',class:'ax-t'},l);
+  });
+  [0,5,10,15,20,25,30].forEach(b=>el('text',{x:x(b),y:H-B+18,'text-anchor':'middle',class:'ax-t'},b));
+  el('text',{x:(L+W-R)/2,y:H-8,'text-anchor':'middle',class:'ax-t'},'deviation score S (bits)');
+  // FLAG zones
+  el('rect',{x:x(28),y:T,width:x(xMax)-x(28),height:H-T-B,style:'fill:var(--bad-soft)'});
+  el('text',{x:x(28)+6,y:T+16,class:'ax-t',style:'fill:var(--bad)'},'FLAG (prod ≥ 28)');
+  el('line',{x1:x(18),x2:x(18),y1:T,y2:H-B,style:'stroke:var(--bad)','stroke-dasharray':'4 4'});
+  el('text',{x:x(18)+6,y:H-B-10,class:'ax-t',style:'fill:var(--bad)'},'testnet FLAG ≥ 18');
+  el('rect',{x:x(0),y:T,width:x(2.5)-x(0),height:H-T-B,style:'fill:var(--cre-soft)'});
+  el('text',{x:x(0)+4,y:T+16,class:'ax-t',style:'fill:var(--cre)'},'quiet');
+  let d='';
+  for(let s=0;s<=28;s+=0.1){const sec=Math.min(259200,900*Math.pow(2,s/2.5));d+=(d?'L':'M')+x(s).toFixed(1)+' '+y(sec).toFixed(1)}
+  el('path',{d,class:'curve'});
+  el('line',{x1:L,x2:L,y1:T,y2:H-B,class:'ax'}); el('line',{x1:L,x2:W-R,y1:H-B,y2:H-B,class:'ax'});
+  const pt=(s,lbl,dy)=>{const sec=Math.min(259200,900*Math.pow(2,s/2.5));el('circle',{cx:x(s),cy:y(sec),r:5,style:'fill:var(--accent)'});el('text',{x:x(s)+9,y:y(sec)+dy,class:'ax-t',style:'fill:var(--ink)'},lbl)};
+  pt(3,'payroll ≈ 3 bits → ~35 min',-8);
+  pt(10,'new vendor, big amount → ~4 h',-8);
+  pt(20.4,'MaxDelay cap 72 h',18);
+})();
+</script>

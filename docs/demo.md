@@ -13,6 +13,8 @@ Live on the deployment in [`deployments/arc.json`](../deployments/arc.json). Amo
 - [ ] nvidia marked verified, so its FLAG also blocklists the destination (Hub admin): `cast send <hub> "setVerified(address,bool)" <nvidia vault> true --rpc-url $ARC_RPC_URL --account <keystore>`.
 - [ ] Onboard with business hours (UTC) that cover the demo time; the scores below are for in-hours requests.
 
+**CRE live monitor (keep it on screen next to the browser):** `cd cre && bun run live --broadcast`. Every button press in the app (dev build) shows up, then the Hub event it caused, then the real `cre workflow simulate sentinel` run for that log (event index computed from the receipt), then the report landing in `Hub.onReport`. Press `r` for a Reconciler cron run, `b` to toggle broadcast. It replaces the manual command below.
+
 **Scoring a request live:** every queued request emits `RequestQueued` on the Hub. Copy the tx hash from the toast's "view" link and run the Sentinel against it, writing the result onchain:
 
 ```bash
